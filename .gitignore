@@ -1,3 +1,6 @@
+# Also remove the local Pipfile
+Pipfile
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
