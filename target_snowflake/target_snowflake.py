@@ -33,6 +33,11 @@ class TargetSnowflake:
         self.schemas: List = []
         self.loaders: Dict = {}
 
+        # Also keep track of a template empty record for each stream in order
+        #  to map all incoming records against and normalize them to use their
+        #  fully defined schema
+        self.template_records: Dict = {}
+
         # The key_properties has the keys for each stream to enable quick
         #  lookups during schema validation of each received record
         #  (all keys should be there even if they are not marked as required)
@@ -91,8 +96,12 @@ class TargetSnowflake:
             if self.timestamp_column not in flat_record:
                 flat_record[self.timestamp_column] = datetime.utcnow()
 
+            # Normalize the record to make sure it follows the full schema defined
+            new_record = self.template_records[stream].copy()
+            new_record.update(flat_record)
+
             # Store the record so that we can load in batch_size batches
-            self.rows[stream].append(flat_record)
+            self.rows[stream].append(new_record)
             self.row_count[stream] += 1
 
             # If the batch_size has been reached for this stream, flush the records
@@ -150,6 +159,10 @@ class TargetSnowflake:
             #  are not there.
             loader = SnowflakeLoader(table=sqlalchemy_table, config=self.config)
             loader.schema_apply()
+
+            # Keep a template empty record for each stream in order to map
+            #  all incoming records against
+            self.template_records[stream] = loader.empty_record()
 
             # Keep the loader in loaders[stream] to be used for loading the
             #  records received for that stream.
