@@ -1,6 +1,7 @@
 import collections
 import inflection
 import itertools
+import logging
 import re
 
 from sqlalchemy import MetaData, Table, Column
@@ -15,7 +16,8 @@ from snowflake.sqlalchemy import ARRAY, OBJECT
 # + flatten_schema(json_schema_definition) --> flatten a given json schema.
 # + generate_sqlalchemy_table(stream, key_properties, json_schema, timestamp_column)
 #    --> Generate an sqlalchemy Table based on a SCHEMA message
-
+logger = logging.getLogger()
+logger.setLevel(logging.WARNING)
 
 def generate_sqlalchemy_table(stream, key_properties, json_schema, timestamp_column):
     flat_schema = flatten_schema(json_schema)

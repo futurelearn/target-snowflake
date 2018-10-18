@@ -35,6 +35,23 @@ class SnowflakeLoader:
             )
         )
 
+    def empty_record(self) -> Dict:
+        """
+        Get a dictionary representing an empty (all attributes None) record for
+        the table associated with this SnowflakeLoader instance.
+
+        Used as a template in order to normalize (map) all imported records to
+        the full schema they are defined for.
+
+        Important for records with multiple optional attributes that are not
+        always there, like for example Multi Level JSON objects that are
+        flattened before uploaded to SNowflake.
+
+        Guards against sqlalchemy errors for missing required values for
+        bind parameters.
+        """
+        return dict.fromkeys(column.name for column in self.table.columns)
+
     def schema_apply(self) -> None:
         """
         Apply the schema defined for self.table to the Database we connect to

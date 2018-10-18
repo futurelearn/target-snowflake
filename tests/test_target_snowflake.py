@@ -97,6 +97,25 @@ class TestTargetSnowflake:
                 snowflake_engine, config["database"], config["schema"]
             )
 
+    def test_optional_attributes(self, config, snowflake_engine):
+        # Start with a simple initial insert for everything
+
+        # The expected results to compare
+        expected_results = {
+            "state": {"test_optional_attributes": 4},
+            "tables": ["test_optional_attributes"],
+            "columns": {
+                "test_optional_attributes": ["id", "optional", config["timestamp_column"]],
+            },
+            "total_records": {
+                "test_optional_attributes": 4,
+            },
+        }
+
+        test_stream = "optional_attributes.stream"
+
+        self.integration_test(config, snowflake_engine, expected_results, test_stream)
+
     @pytest.mark.slow
     def test_relational_data(self, config, snowflake_engine):
         # Start with a simple initial insert for everything
