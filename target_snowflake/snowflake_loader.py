@@ -1,7 +1,7 @@
 import os
 import logging
 
-from typing import Dict, List
+from typing import Dict, Iterable
 from sqlalchemy import create_engine, inspect, Table
 from sqlalchemy.schema import CreateSchema
 from snowflake.sqlalchemy import URL
@@ -76,7 +76,7 @@ class SnowflakeLoader:
         if schema_updated:
             self.grant_privileges(self.role)
 
-    def load(self, data: List[Dict]) -> None:
+    def load(self, data: Iterable[Dict]) -> None:
         """
         Load the data provided as a list of dictionaries to the given Table
 
