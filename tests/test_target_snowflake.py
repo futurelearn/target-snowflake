@@ -98,8 +98,6 @@ class TestTargetSnowflake:
             )
 
     def test_optional_attributes(self, config, snowflake_engine):
-        # Start with a simple initial insert for everything
-
         # The expected results to compare
         expected_results = {
             "state": {"test_optional_attributes": 4},
@@ -172,8 +170,6 @@ class TestTargetSnowflake:
 
     @pytest.mark.slow
     def test_no_primary_keys(self, config, snowflake_engine):
-        # Start with a simple initial insert for everything
-
         # The expected results to compare
         expected_results = {
             "state": {"test_no_pk": 3},
@@ -201,6 +197,23 @@ class TestTargetSnowflake:
         self.integration_test(
             config, snowflake_engine, expected_results, test_stream, drop_schema=True
         )
+
+    def test_duplicate_records(self, config, snowflake_engine):
+        # The expected results to compare
+        expected_results = {
+            "state": {"test_duplicate_records": 2},
+            "tables": ["test_duplicate_records"],
+            "columns": {
+                "test_duplicate_records": ["id", "metric", config["timestamp_column"]],
+            },
+            "total_records": {
+                "test_duplicate_records": 2,
+            },
+        }
+
+        test_stream = "duplicate_records.stream"
+
+        self.integration_test(config, snowflake_engine, expected_results, test_stream)
 
     @pytest.mark.slow
     def test_array_data(self, config, snowflake_engine):
