@@ -17,6 +17,9 @@ class RecordBuffer(list):
     def add_record(self, record: Dict):
         self.append(record)
 
+    def values(self):
+        return self
+
 
 class UniqueRecordBuffer(dict):
     def __init__(self, key_func=lambda x: x):
@@ -25,8 +28,12 @@ class UniqueRecordBuffer(dict):
     def add_record(self, record: Dict):
         self[self.key(record)] = record
 
+    def values(self):
+        return list(super().values())
+
     def __iter__(self):
-        return enumerate(self.values())
+        for record in self.values():
+            yield record
 
 
 class TargetSnowflake:
@@ -235,7 +242,7 @@ class TargetSnowflake:
         """
 
         # Load the data
-        self.loaders[stream].load(self.rows[stream])
+        self.loaders[stream].load(self.rows[stream].values())
 
         # Clear the cached records and reset the counter for the stream
         self.rows[stream].clear()
