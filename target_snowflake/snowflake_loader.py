@@ -83,28 +83,29 @@ class SnowflakeLoader:
         If there are Primary Keys defined, then we UPSERT them by loading
         the data to a temporary table and then using Snowflake's MERGE operation
         """
-        if len(data) > 0:
-            logging.debug(f"Loading data to Snowflake for {self.table.name}")
+        if not data:
+            return
 
-            if len(self.table.primary_key) > 0:
-                # We have to use Snowflake's Merge in order to Upsert
+        logging.debug(f"Loading data to Snowflake for {self.table.name}")
+        if self.table.primary_key:
+            # We have to use Snowflake's Merge in order to Upsert
 
-                # Create Temporary table to load the data to
-                tmp_table = self.create_tmp_table()
+            # Create Temporary table to load the data to
+            tmp_table = self.create_tmp_table()
 
-                with self.engine.connect() as connection:
-                    connection.execute(tmp_table.insert(), data)
+            with self.engine.connect() as connection:
+                connection.execute(tmp_table.insert(), data)
 
-                    # Merge Temporary Table into the Table we want to load data into
-                    merge_stmt = self.generate_merge_stmt(tmp_table.name)
-                    connection.execute(merge_stmt)
+                # Merge Temporary Table into the Table we want to load data into
+                merge_stmt = self.generate_merge_stmt(tmp_table.name)
+                connection.execute(merge_stmt)
 
-                # Drop the Temporary Table
-                tmp_table.drop(self.engine)
-            else:
-                # Just Insert (append) as no conflicts can arise
-                with self.engine.connect() as connection:
-                    connection.execute(self.table.insert(), data)
+            # Drop the Temporary Table
+            tmp_table.drop(self.engine)
+        else:
+            # Just Insert (append) as no conflicts can arise
+            with self.engine.connect() as connection:
+                connection.execute(self.table.insert(), data)
 
     def create_tmp_table(self) -> Table:
         """

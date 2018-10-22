@@ -13,6 +13,29 @@ from target_snowflake.utils.singer_target_utils import (
 from target_snowflake.snowflake_loader import SnowflakeLoader
 
 
+class RecordBuffer(list):
+    def add_record(self, record: Dict):
+        self.append(record)
+
+    def values(self):
+        return self
+
+
+class UniqueRecordBuffer(dict):
+    def __init__(self, key_func=lambda x: x):
+        self.key = key_func
+
+    def add_record(self, record: Dict):
+        self[self.key(record)] = record
+
+    def values(self):
+        return list(super().values())
+
+    def __iter__(self):
+        for record in self.values():
+            yield record
+
+
 class TargetSnowflake:
     def __init__(self, config: Dict) -> None:
         # Store the Config so that we can use it to initiate Snowflake Loaders
@@ -47,16 +70,17 @@ class TargetSnowflake:
         #  new records against
         self.validators: Dict = {}
 
-        # Cache the records for each stream in rows[stream] and keep a counter for
-        #  how many rows we have pending for that stream in row_count[stream]
-        # When the row_count[stream] reaches the batch_size or when the tap stops
+        # Cache the records for each stream in rows[stream]
+        # When the cache reaches the batch_size or when the tap stops
         #  sending data, we flush the cached records (i.e. send them in batch to
         #  Snowflake). This is important for performance: we don't want to send
         #  an insert with each record received.
         self.rows: Dict = {}
-        self.row_count: Dict = {}
 
         self.logger = singer.get_logger()
+
+    def extract_keys(self, stream: str, record: Dict):
+        return tuple(record[key] for key in self.key_properties[stream])
 
     def process_line(self, line: str) -> None:
         """
@@ -101,11 +125,10 @@ class TargetSnowflake:
             new_record.update(flat_record)
 
             # Store the record so that we can load in batch_size batches
-            self.rows[stream].append(new_record)
-            self.row_count[stream] += 1
+            self.rows[stream].add_record(new_record)
 
             # If the batch_size has been reached for this stream, flush the records
-            if self.row_count[stream] >= self.batch_size:
+            if len(self.rows[stream]) >= self.batch_size:
                 self.flush_records(stream)
 
             self.state = None
@@ -131,8 +154,6 @@ class TargetSnowflake:
             # Record that the schema for this stream has been received and
             #  initialized the rows and row_count for that stream
             self.schemas.append(stream)
-            self.rows[stream] = []
-            self.row_count[stream] = 0
 
             # Add a validator based on the received JSON Schema
             self.validators[stream] = Draft4Validator(
@@ -144,14 +165,16 @@ class TargetSnowflake:
             if "key_properties" not in o:
                 raise Exception("key_properties field is required")
 
+            key_properties = o["key_properties"]
+
             # Store the Key properties for quick lookups during record validation
-            self.key_properties[stream] = o["key_properties"]
+            self.key_properties[stream] = key_properties
 
             # Generate an sqlalchemy Table based on the info received
             # It is used to store and access all the schema information
             #  in a structured way
             sqlalchemy_table = generate_sqlalchemy_table(
-                stream, o["key_properties"], o["schema"], self.timestamp_column
+                stream, key_properties, o["schema"], self.timestamp_column
             )
 
             # Create a SnowflakeLoader for that sqlalchemy Table and
@@ -159,6 +182,13 @@ class TargetSnowflake:
             #  are not there.
             loader = SnowflakeLoader(table=sqlalchemy_table, config=self.config)
             loader.schema_apply()
+
+            # This buffering makes sure that if we it multiple row that would violate
+            #  the `key_properties` uniqueness, only the last one will be kept.
+            if key_properties:
+                self.rows[stream] = UniqueRecordBuffer(lambda record: self.extract_keys(stream, record))
+            else:
+                self.rows[stream] = RecordBuffer()
 
             # Keep a template empty record for each stream in order to map
             #  all incoming records against
@@ -198,7 +228,7 @@ class TargetSnowflake:
         Flush the records for any remaining streams that still have
         records cached (i.e. row_count < batch_size)
         """
-        to_flush = (stream for (stream, count) in self.row_count.items() if count)
+        to_flush = (stream for (stream, rows) in self.rows.items() if len(rows))
 
         for stream in to_flush:
             self.flush_records(stream)
@@ -212,11 +242,10 @@ class TargetSnowflake:
         """
 
         # Load the data
-        self.loaders[stream].load(self.rows[stream])
+        self.loaders[stream].load(self.rows[stream].values())
 
         # Clear the cached records and reset the counter for the stream
         self.rows[stream].clear()
-        self.row_count[stream] = 0
 
     def emit_state(self) -> None:
         """
