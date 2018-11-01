@@ -6,7 +6,9 @@ import singer
 
 from jsonschema import ValidationError
 from sqlalchemy.exc import DatabaseError
+
 from target_snowflake.target_snowflake import TargetSnowflake
+from target_snowflake.utils.error import SchemaUpdateError
 
 LOGGER = singer.get_logger()
 
@@ -68,7 +70,7 @@ def main():
     try:
         # wrap the real main() and catch exceptions we want to handle somehow
         main_implementation()
-    except (ValidationError, DatabaseError) as exc:
+    except (ValidationError, DatabaseError, SchemaUpdateError) as exc:
         for line in str(exc).splitlines():
             LOGGER.critical(line)
         sys.exit(1)

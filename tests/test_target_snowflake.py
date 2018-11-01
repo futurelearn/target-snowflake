@@ -10,6 +10,7 @@ from target_snowflake.utils.snowflake_helpers import (
     schema_exists,
     drop_snowflake_schema,
 )
+from target_snowflake.utils.error import SchemaUpdateError
 
 
 def load_stream(filename):
@@ -97,22 +98,79 @@ class TestTargetSnowflake:
                 snowflake_engine, config["database"], config["schema"]
             )
 
+    @pytest.mark.slow
     def test_optional_attributes(self, config, snowflake_engine):
         # The expected results to compare
         expected_results = {
             "state": {"test_optional_attributes": 4},
             "tables": ["test_optional_attributes"],
             "columns": {
-                "test_optional_attributes": ["id", "optional", config["timestamp_column"]],
+                "test_optional_attributes": [
+                    "id",
+                    "optional",
+                    config["timestamp_column"],
+                ]
             },
-            "total_records": {
-                "test_optional_attributes": 4,
-            },
+            "total_records": {"test_optional_attributes": 4},
         }
 
         test_stream = "optional_attributes.stream"
 
         self.integration_test(config, snowflake_engine, expected_results, test_stream)
+
+    @pytest.mark.slow
+    def test_schema_updates(self, config, snowflake_engine):
+        # The expected results to compare
+        expected_results = {
+            "state": {"test_schema_updates": 6},
+            "tables": ["test_schema_updates"],
+            "columns": {
+                "test_schema_updates": [
+                    "id",
+                    "a1",
+                    "a2",
+                    "a3",
+                    "a4__id",
+                    "a4__value",
+                    "a5",
+                    "a6",
+                    config["timestamp_column"],
+                ]
+            },
+            "total_records": {"test_schema_updates": 6},
+        }
+
+        test_stream = "schema_updates.stream"
+
+        self.integration_test(config, snowflake_engine, expected_results, test_stream)
+
+    def test_schema_update_with_invalid_type_change(self, config, snowflake_engine):
+        # Before running any integration test, check if the schema defined in
+        #  the config is a new one (i.e. drop it afterwards)
+        #  or an existing one (i.e. keep it - it could be the public one or
+        #   a production schema used by mistake)
+        new_schema = not schema_exists(snowflake_engine, config["schema"])
+
+        test_stream = "schema_update_with_invalid_type_change.stream"
+        target = TargetSnowflake(config)
+        stream = load_stream(test_stream)
+
+        with pytest.raises(SchemaUpdateError) as excinfo:
+            for line in stream:
+                target.process_line(line)
+        assert "Not allowed type update" in str(excinfo.value)
+
+        # Drop the Test Tables
+        for stream, loader in target.loaders.items():
+            loader.table.drop(loader.engine)
+
+        # Drop the Schema if we created it and there is nothing left there
+        inspector = inspect(snowflake_engine)
+        all_table_names = inspector.get_table_names(config["schema"])
+        if new_schema and (len(all_table_names) == 0):
+            drop_snowflake_schema(
+                snowflake_engine, config["database"], config["schema"]
+            )
 
     @pytest.mark.slow
     def test_relational_data(self, config, snowflake_engine):
@@ -204,11 +262,9 @@ class TestTargetSnowflake:
             "state": {"test_duplicate_records": 2},
             "tables": ["test_duplicate_records"],
             "columns": {
-                "test_duplicate_records": ["id", "metric", config["timestamp_column"]],
+                "test_duplicate_records": ["id", "metric", config["timestamp_column"]]
             },
-            "total_records": {
-                "test_duplicate_records": 2,
-            },
+            "total_records": {"test_duplicate_records": 2},
         }
 
         test_stream = "duplicate_records.stream"

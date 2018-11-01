@@ -142,18 +142,17 @@ class TargetSnowflake:
                 )
 
             stream = o["stream"]
-            if stream in self.schemas:
-                # I don't believe that changing schema on the fly should be
-                #  even allowed for this type of Data Stores.
-                # Skipping it at the moment. TBD
-                self.logger.warn(
-                    "Skipping already defined Schema for {}: {}".format(stream, line)
-                )
-                return
 
-            # Record that the schema for this stream has been received and
-            #  initialized the rows and row_count for that stream
-            self.schemas.append(stream)
+            if stream in self.schemas:
+                # We received a new Schema message for a stream that already
+                #  has a Schema defined.
+                # Flush the cached records as we may have an updated Schema
+                #  going forward that will be incompatible with the current one
+                self.flush_records(stream)
+            else:
+                # The Schema message is for a newly encountered stream
+                # Record that the schema for this stream has been received
+                self.schemas.append(stream)
 
             # Add a validator based on the received JSON Schema
             self.validators[stream] = Draft4Validator(
@@ -183,10 +182,13 @@ class TargetSnowflake:
             loader = SnowflakeLoader(table=sqlalchemy_table, config=self.config)
             loader.schema_apply()
 
-            # This buffering makes sure that if we it multiple row that would violate
-            #  the `key_properties` uniqueness, only the last one will be kept.
+            # This buffering makes sure that if we receive multiple rows that
+            #  would violate the `key_properties` uniqueness,
+            #  only the last one will be kept.
             if key_properties:
-                self.rows[stream] = UniqueRecordBuffer(lambda record: self.extract_keys(stream, record))
+                self.rows[stream] = UniqueRecordBuffer(
+                    lambda record: self.extract_keys(stream, record)
+                )
             else:
                 self.rows[stream] = RecordBuffer()
 

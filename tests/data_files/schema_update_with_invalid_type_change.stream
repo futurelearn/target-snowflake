@@ -1,0 +1,2 @@
+{"type": "SCHEMA", "stream": "test_schema_updates", "key_properties": ["id"], "schema": {"type": "object", "properties": {"id": {"type": "integer"}, "a1": {"type": "integer"}, "a2": {"type": "number"}, "a3": {"type": "number"}}}}
+{"type": "SCHEMA", "stream": "test_schema_updates", "key_properties": ["id"], "schema": {"type": "object", "properties": {"id": {"type": "integer"}, "a1": {"type": "number"}, "a2": {"type": "string"}, "a3": {"type": "integer"}}}}

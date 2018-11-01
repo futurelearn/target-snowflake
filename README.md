@@ -100,6 +100,31 @@ composite key (combination of key_properties) then the new record UPDATEs the ex
 
 *  Even if there is no `config['timestamp_column']` attribute in the SCHEMA sent to the Snowflake Target for a specific stream, it is added explicitly. Each RECORD has the timestamp of when it was received by the Target as a value.
 
+*  Schema updates are supported, both in case the schema of an entity changes in a future run but also in case we receive more than one SCHEMA messages for a specific stream in the same execution of `target-snowflake`.
+
+    When a SCHEMA message for a stream is received, `target-snowflake` checks in the Snowflake Database provided in the config whether there is already a table for the entity defined by the stream.
+    * If there is no such table (or even schema), they are created.
+    * If there is already a table for that entity, `target-snowflake` creates a diff in order to check if new attributes must be added to the table or existing ones have their type updated and moves forward with making the changes.
+
+    Rules followed:
+    1. Only support type upgrades (e.g. STRING -> VARCHAR) for existing columns
+    2. If a not supported type update is requested (e.g. float --> int), then an exception is raised.
+    2. Never drop columns, only UPDATE existing ones or ADD new ones
+
+    There is a limitation in Snowflake that really limits the possible transitions:
+
+    https://docs.snowflake.net/manuals/sql-reference/sql/alter-table-column.html
+
+    > In `ALTER TABLE … ALTER COLUMN <col1_name> SET DATA TYPE <type>`, when setting the TYPE for a column, the specified type must be a text data type (VARCHAR, STRING, TEXT, etc.).
+
+    > Also, TYPE can be used only to increase the length of a text column.
+
+    That means that no (INT --> FLOAT) or (INT --> STRING), etc type upgrades are allowed by Snowflake.
+
+    Together with the fact that `target-snowflake` (wich follows the snowflake.sqlalchemy rules) uses the maximum type length for all strings (VARCHAR(16777216)), at the moment no meaningful data type upgrades are supported.
+
+    But there is full support in `target-snowflake` for data type upgrades in case they are supported by Snowflake in the future. Additional `allowed_type_transitions` can be added in SnowflakeLoader as Snowflake may evolve its implementation in the future.
+
 *  We unnest Nested JSON Data Structures and follow a `[object_name]__[property_name]` approach similar to [what Stitch platform also does](https://www.stitchdata.com/docs/data-structure/nested-data-structures-row-count-impact).
 
 *  At the moment we do not deconstruct nested arrays. Arrays are stored as STRINGs with the relevant JSON representation stored as is. e.g. "['banana','apple']"
