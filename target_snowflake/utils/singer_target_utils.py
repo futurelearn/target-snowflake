@@ -19,6 +19,7 @@ from snowflake.sqlalchemy import ARRAY, OBJECT
 logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
 
+
 def generate_sqlalchemy_table(stream, key_properties, json_schema, timestamp_column):
     flat_schema = flatten_schema(json_schema)
     schema_dict = {
