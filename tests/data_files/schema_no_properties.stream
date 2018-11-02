@@ -1,0 +1,2 @@
+{"type": "SCHEMA", "stream": "test_schema_no_properties", "schema": {"type": "object"}, "key_properties": ["id"]}
+{"type": "RECORD", "stream": "test_schema_no_properties", "record": {"id": 1, "metric": 3}}

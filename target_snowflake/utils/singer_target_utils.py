@@ -82,26 +82,27 @@ def flatten_record(d, parent_key=[], sep="__"):
 
 def flatten_schema(d, parent_key=[], sep="__"):
     items = []
-    for k, v in d["properties"].items():
-        new_key = flatten_key(k, parent_key, sep)
+    if "properties" in d.keys():
+        for k, v in d["properties"].items():
+            new_key = flatten_key(k, parent_key, sep)
 
-        if not v:
-            logger.warn("Empty definition for {}.".format(new_key))
-            continue
+            if not v:
+                logger.warn("Empty definition for {}.".format(new_key))
+                continue
 
-        if "type" in v.keys():
-            if "object" in v["type"]:
-                items.extend(flatten_schema(v, parent_key + [k], sep=sep).items())
+            if "type" in v.keys():
+                if "object" in v["type"]:
+                    items.extend(flatten_schema(v, parent_key + [k], sep=sep).items())
+                else:
+                    items.append((new_key, v))
             else:
-                items.append((new_key, v))
-        else:
-            property = list(v.values())[0][0]
-            if property["type"] == "string":
-                property["type"] = ["null", "string"]
-                items.append((new_key, property))
-            elif property["type"] == "array":
-                property["type"] = ["null", "array"]
-                items.append((new_key, property))
+                property = list(v.values())[0][0]
+                if property["type"] == "string":
+                    property["type"] = ["null", "string"]
+                    items.append((new_key, property))
+                elif property["type"] == "array":
+                    property["type"] = ["null", "array"]
+                    items.append((new_key, property))
 
     key_func = lambda item: item[0]
     sorted_items = sorted(items, key=key_func)

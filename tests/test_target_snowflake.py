@@ -181,6 +181,27 @@ class TestTargetSnowflake:
 
         self.integration_test(config, snowflake_engine, expected_results, test_stream)
 
+
+    @pytest.mark.slow
+    def test_schema_no_properties(self, config, snowflake_engine):
+        # The expected results to compare
+        expected_results = {
+            "state": None,
+            "tables": ["test_schema_no_properties"],
+            "columns": {
+                "test_schema_no_properties": [
+                    "id",
+                    config["timestamp_column"],
+                ]
+            },
+            "total_records": {"test_schema_no_properties": 1},
+        }
+
+        test_stream = "schema_no_properties.stream"
+
+        self.integration_test(config, snowflake_engine, expected_results, test_stream)
+
+
     @pytest.mark.slow
     def test_schema_updates(self, config, snowflake_engine):
         # The expected results to compare
