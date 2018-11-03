@@ -99,6 +99,37 @@ class TestTargetSnowflake:
             )
 
     @pytest.mark.slow
+    def test_camelcase(self, config, snowflake_engine):
+        # The expected results to compare
+        expected_results = {
+            "state": None,
+            "tables": ["test_camelcase"],
+            "columns": {
+                "test_camelcase": [
+                    "id",
+                    "client_name",
+                    config["timestamp_column"],
+                ]
+            },
+            "total_records": {"test_camelcase": 2},
+        }
+
+        test_stream = "camelcase.stream"
+
+        self.integration_test(config, snowflake_engine, expected_results, test_stream, False)
+
+        # We also need to test that the record has data in the camelcased field
+        with snowflake_engine.connect() as connection:
+            item_query = f"SELECT client_name FROM {config['schema']}.test_camelcase"
+            item_result = connection.execute(item_query).fetchone()
+            assert item_result[0] == "Gitter Windows Desktop App"
+
+        drop_snowflake_schema(
+            snowflake_engine, config["database"], config["schema"]
+        )
+
+
+    @pytest.mark.slow
     def test_optional_attributes(self, config, snowflake_engine):
         # The expected results to compare
         expected_results = {
@@ -319,6 +350,7 @@ class TestTargetSnowflake:
         test_stream = "encoded_strings.stream"
 
         self.integration_test(config, snowflake_engine, expected_results, test_stream)
+
 
     def integration_test(
         self, config, snowflake_engine, expected, stream_file, drop_schema=True
