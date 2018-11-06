@@ -1,7 +1,7 @@
 # target-snowflake
 
 This is a [Singer](https://singer.io) target that reads JSON-formatted data
-following the [Singer spec](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md) 
+following the [Singer spec](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md)
 and loads them to Snowflake.
 
 
@@ -18,7 +18,7 @@ Alternatively, run `make build` to get a docker image containing target-snowflak
 **config.json**
 ```json
 {
-  "account": "Account Name in Snowflake",
+  "account": "Account Name in Snowflake (https://XXXXX.snowflakecomputing.com), https://docs.snowflake.net/manuals/user-guide/connecting.html#your-snowflake-account-name-and-url",
   "username": "",
   "password": "",
   "role": "Role to be used for loading the data, e.g. LOADER. Also this role is GRANTed usage to all tables and schemas created",
@@ -77,7 +77,7 @@ This includes a set of simple tests to check that the connection to Snowflake is
 
 `make test-quick`
 
-During the tests we create a test table(SNOWFLAKE_TARGET_TMP_TEST_TABLE), populate it with simple data, assert that both the schema and the data loaded are as expected and in the end we destroy it. 
+During the tests we create a test table(SNOWFLAKE_TARGET_TMP_TEST_TABLE), populate it with simple data, assert that both the schema and the data loaded are as expected and in the end we destroy it.
 
 ### Integration Tests for target-snowflake
 
@@ -93,7 +93,7 @@ Those tests may take a little bit more than simple unit tests depending on the c
 
 There are some implicit decisions on the implementation of this Target:
 
-*  Data are UPSERTed when an entity has at least one primary key (key_properties not empty). If there is already a row with the same 
+*  Data are UPSERTed when an entity has at least one primary key (key_properties not empty). If there is already a row with the same
 composite key (combination of key_properties) then the new record UPDATEs the existing one.
 
     In order for this TARGET to work on append only mode and the target tables to store historical information, no key_properties must be defined (the `config['timestamp_column']`'s value can be used to get the most recent information).
