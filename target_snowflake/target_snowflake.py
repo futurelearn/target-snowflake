@@ -4,13 +4,16 @@ import sys
 
 from datetime import datetime
 from jsonschema import ValidationError, Draft4Validator, FormatChecker
-from typing import Dict, List
+from typing import Dict, List, Iterator
 
 from target_snowflake.utils.singer_target_utils import (
     flatten,
     generate_sqlalchemy_table,
 )
 from target_snowflake.snowflake_loader import SnowflakeLoader
+
+
+LOGGER = singer.get_logger()
 
 
 class RecordBuffer(list):
@@ -36,6 +39,52 @@ class UniqueRecordBuffer(dict):
             yield record
 
 
+class StateBuffer:
+    """
+    A Buffer to store all state messages as we receive them, so that we can
+    flush them to stdout the moment all their relevant streams are flushed.
+
+    The Singer.io specification allows full freedom to each tap on what to store
+    in its STATE messages. So, without insight to each Tap's business logic, the
+    only way for a target to be sure that a STATE message is ready to be flushed
+    to stdoud, is to wait for all RECORDS that have arrived before the STATE
+    message to be processed and then flush the STATE message.
+
+    The idea is that we store the STATE messages ordered in a State Buffer,
+    together with all the unflushed streams the moment it was received.
+
+    Each time a stream is flushed, we also update all the relevant streams for
+    the STATE messages stored in the StateBuffer and then check if any STATE
+    messages have no more any unflushed streams associated with them.
+
+    Those are streams that can be safely flushed to stdout and, following the
+    Singer.io specification, we flush only the most recent one, as it should
+    have the most up to date information on the state of the Tap.
+    """
+
+    def __init__(self) -> None:
+        self.buffer = []
+
+    def add_state(self, state: str, streams: List) -> None:
+        LOGGER.debug(f"StateBuffer: new state stored {state}: {streams}")
+        self.buffer.append({"state": state, "streams": streams})
+
+    def flush_stream(self, stream: str) -> None:
+        for state in self.buffer:
+            state["streams"] = [x
+                                for x in state["streams"]
+                                if x != stream]
+
+    def pop_states_without_streams(self) -> List[str]:
+        states = [state["state"] for state in self.buffer if not state["streams"]]
+        self.buffer = [state for state in self.buffer if state["streams"]]
+        return states
+
+    def __iter__(self):
+        for state in self.buffer:
+            yield state
+
+
 class TargetSnowflake:
     def __init__(self, config: Dict) -> None:
         # Store the Config so that we can use it to initiate Snowflake Loaders
@@ -44,8 +93,11 @@ class TargetSnowflake:
         self.batch_size = int(config.get("batch_size", 5000))
         self.timestamp_column = config.get("timestamp_column", "__loaded_at")
 
-        # Store the latest state so that we return it when the loading completes
-        self.state = None
+        # Store all the state messages in a State Buffer, so that we can flush
+        #  them to stdout the moment all their relevant streams are flushed
+        self.states = StateBuffer()
+        # Also store the last emitted state for reference and for facilitating tests
+        self.last_emitted_state = None
 
         # Keep track of the streams we have schemas for.
         # A tap sending a record without previously describing its schema is not
@@ -77,8 +129,6 @@ class TargetSnowflake:
         #  an insert with each record received.
         self.rows: Dict = {}
 
-        self.logger = singer.get_logger()
-
     def extract_keys(self, stream: str, record: Dict):
         return tuple(record[key] for key in self.key_properties[stream])
 
@@ -89,7 +139,7 @@ class TargetSnowflake:
         try:
             o = json.loads(line)
         except json.decoder.JSONDecodeError:
-            self.logger.error("Unable to parse:\n{}".format(line))
+            LOGGER.error("Unable to parse:\n{}".format(line))
             raise
 
         if "type" not in o:
@@ -130,11 +180,17 @@ class TargetSnowflake:
             # If the batch_size has been reached for this stream, flush the records
             if len(self.rows[stream]) >= self.batch_size:
                 self.flush_records(stream)
-
-            self.state = None
         elif t == "STATE":
-            self.logger.debug("Setting state to {}".format(o["value"]))
-            self.state = o["value"]
+            new_state = o["value"]
+            unflushed_streams = list(self.streams_with_unflushed_records())
+
+            if unflushed_streams:
+                # There are unflushed streams --> store the STATE message in StateBuffer
+                self.states.add_state(new_state, unflushed_streams)
+            else:
+                # All streams are clean, no cached records at the moment
+                # Just send the STATE message directly to stdout
+                self.emit_state(new_state)
         elif t == "SCHEMA":
             if "stream" not in o:
                 raise Exception(
@@ -201,7 +257,7 @@ class TargetSnowflake:
             self.loaders[stream] = loader
         elif t == "ACTIVATE_VERSION":
             # No support for that type of message yet
-            self.logger.warn("ACTIVATE_VERSION message")
+            LOGGER.warn("ACTIVATE_VERSION message")
         else:
             raise Exception(
                 "Unknown message type {} in message {}".format(o["type"], o)
@@ -230,7 +286,7 @@ class TargetSnowflake:
         Flush the records for any remaining streams that still have
         records cached (i.e. row_count < batch_size)
         """
-        to_flush = (stream for (stream, rows) in self.rows.items() if len(rows))
+        to_flush = self.streams_with_unflushed_records()
 
         for stream in to_flush:
             self.flush_records(stream)
@@ -249,12 +305,30 @@ class TargetSnowflake:
         # Clear the cached records and reset the counter for the stream
         self.rows[stream].clear()
 
-    def emit_state(self) -> None:
+        # Mark the stream as flushed in StateBuffer
+        #  and check if there are any STATE messages ready to be also flushed
+        self.states.flush_stream(stream)
+        states_without_streams = self.states.pop_states_without_streams()
+
+        if states_without_streams:
+            # Only write the most resent state
+            self.emit_state(states_without_streams.pop())
+
+    def emit_state(self, state) -> None:
         """
-        Emit the current state to stdout
+        Emit the given state to stdout
         """
-        if self.state is not None:
-            line = json.dumps(self.state)
-            self.logger.debug("Emitting state {}".format(line))
-            sys.stdout.write("{}\n".format(line))
-            sys.stdout.flush()
+        LOGGER.debug("Emitting state {}".format(state))
+        singer.write_state(state)
+        self.last_emitted_state = state
+
+    def streams_with_unflushed_records(self) -> Iterator[str]:
+        """
+        Return all the streams that have records cached.
+
+        Used in order to:
+        (a) get all the streams to flush when the execution ends
+        (b) when receiving a STATE message, in order to identify 'dirty'
+            streams that must be flushed before emiting the STATE to stdout.
+        """
+        return (stream for (stream, rows) in self.rows.items() if len(rows))

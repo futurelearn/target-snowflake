@@ -40,9 +40,6 @@ def process_input(config, lines):
     #  streams that still have records cached (i.e. row_count < batch_size)
     target.flush_all_cached_records()
 
-    # Finally, Emit the last received state befor exiting
-    target.emit_state()
-
 
 def main_implementation():
     parser = argparse.ArgumentParser()
@@ -61,7 +58,7 @@ def main_implementation():
 
     # Run the Input processing loop until everything is done
     input = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8")
-    state = process_input(config, input)
+    process_input(config, input)
 
     LOGGER.debug("Exiting normally")
 
