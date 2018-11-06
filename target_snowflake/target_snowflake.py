@@ -236,7 +236,15 @@ class TargetSnowflake:
             #  run schema_apply() to create the Schema and/or Table if they
             #  are not there.
             loader = SnowflakeLoader(table=sqlalchemy_table, config=self.config)
-            loader.schema_apply()
+
+            try:
+                loader.schema_apply()
+            except Exception as exc:
+                LOGGER.error(
+                    "Exception in schema_apply() while prrocessing:\n{}".format(line)
+                )
+                raise exc
+
 
             # This buffering makes sure that if we receive multiple rows that
             #  would violate the `key_properties` uniqueness,
