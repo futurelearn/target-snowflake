@@ -10,7 +10,7 @@ from snowflake.sqlalchemy import ARRAY, OBJECT
 
 # Set of helper functions for flattening records and schemas.
 # The core ones are:
-# + flatten(record) --> flatten a given data record.
+# + flatten_record(record) --> flatten a given data record.
 #  e.g. {"id": 3, "info": {"weather": "sunny", "mood": "happy"}}}
 #     --> {"id": 3, "info__weather": "sunny", "info__mood": "happy"}
 # + flatten_schema(json_schema_definition) --> flatten a given json schema.
@@ -42,17 +42,6 @@ def generate_sqlalchemy_table(stream, key_properties, json_schema, timestamp_col
     return table
 
 
-def flatten(d, parent_key="", sep="__"):
-    items = []
-    for k, v in d.items():
-        new_key = parent_key + sep + k if parent_key else k
-        if isinstance(v, collections.MutableMapping):
-            items.extend(flatten(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, str(v) if type(v) is list else v))
-    return dict(items)
-
-
 def inflect_column_name(name):
     name = re.sub(r"([A-Z]+)_([A-Z][a-z])", r"\1__\2", name)
     name = re.sub(r"([a-z\d])_([A-Z])", r"\1__\2", name)
@@ -73,6 +62,17 @@ def flatten_key(k, parent_key, sep):
         reducer_index += 1
 
     return sep.join(inflected_key)
+
+
+def flatten_record(d, parent_key=[], sep="__"):
+    items = []
+    for k, v in d.items():
+        new_key = flatten_key(k, parent_key, sep)
+        if isinstance(v, collections.MutableMapping):
+            items.extend(flatten_record(v, parent_key + [k], sep=sep).items())
+        else:
+            items.append((new_key, str(v) if type(v) is list else v))
+    return dict(items)
 
 
 def flatten_schema(d, parent_key=[], sep="__"):

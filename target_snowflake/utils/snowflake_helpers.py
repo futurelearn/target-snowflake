@@ -11,3 +11,9 @@ def drop_snowflake_schema(snowflake_engine, db, schema):
     with snowflake_engine.connect() as connection:
         # Skip the CASCADE clause to be on the safe side while running tests
         connection.execute(f"DROP SCHEMA {db}.{schema}")
+
+
+def drop_snowflake_table(snowflake_engine, db, schema, table):
+    with snowflake_engine.connect() as connection:
+        # Skip the CASCADE clause to be on the safe side while running tests
+        connection.execute(f"DROP TABLE {db}.{schema}.{table}")

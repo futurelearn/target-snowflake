@@ -9,6 +9,7 @@ from target_snowflake.target_snowflake import TargetSnowflake
 from target_snowflake.utils.snowflake_helpers import (
     schema_exists,
     drop_snowflake_schema,
+    drop_snowflake_table
 )
 from target_snowflake.utils.error import SchemaUpdateError
 
@@ -97,6 +98,47 @@ class TestTargetSnowflake:
             drop_snowflake_schema(
                 snowflake_engine, config["database"], config["schema"]
             )
+
+    @pytest.mark.slow
+    def test_camelcase(self, config, snowflake_engine):
+        # check if the schema is a new one, ... etc ..
+        new_schema = not schema_exists(snowflake_engine, config["schema"])
+
+        # The expected results to compare
+        expected_results = {
+            "state": None,
+            "tables": ["test_camelcase"],
+            "columns": {
+                "test_camelcase": [
+                    "id",
+                    "client_name",
+                    config["timestamp_column"],
+                ]
+            },
+            "total_records": {"test_camelcase": 2},
+        }
+
+        test_stream = "camelcase.stream"
+
+        self.integration_test(config, snowflake_engine, expected_results, test_stream, False)
+
+        # We also need to test that the record has data in the camelcased field
+        with snowflake_engine.connect() as connection:
+            item_query = f"SELECT client_name FROM {config['schema']}.test_camelcase"
+            item_result = connection.execute(item_query).fetchone()
+            assert item_result[0] == "Gitter Windows Desktop App"
+
+        # Drop the Test Table
+        drop_snowflake_table(
+            snowflake_engine, config["database"], config["schema"], "test_camelcase"
+        )
+
+        # Drop the Schema if we created it
+        if new_schema:
+            drop_snowflake_schema(
+                snowflake_engine, config["database"], config["schema"]
+            )
+
 
     @pytest.mark.slow
     def test_optional_attributes(self, config, snowflake_engine):
@@ -367,6 +409,7 @@ class TestTargetSnowflake:
         test_stream = "encoded_strings.stream"
 
         self.integration_test(config, snowflake_engine, expected_results, test_stream)
+
 
     def integration_test(
         self, config, snowflake_engine, expected, stream_file, drop_schema=True

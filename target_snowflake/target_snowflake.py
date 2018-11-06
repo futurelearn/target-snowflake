@@ -7,7 +7,7 @@ from jsonschema import ValidationError, Draft4Validator, FormatChecker
 from typing import Dict, List, Iterator
 
 from target_snowflake.utils.singer_target_utils import (
-    flatten,
+    flatten_record,
     generate_sqlalchemy_table,
 )
 from target_snowflake.snowflake_loader import SnowflakeLoader
@@ -164,7 +164,7 @@ class TargetSnowflake:
             self.schema_validation(stream, o["record"], self.key_properties[stream])
 
             # Flatten the record
-            flat_record = flatten(o["record"])
+            flat_record = flatten_record(o["record"])
 
             # Add an `timestamp_column` timestamp for the record
             if self.timestamp_column not in flat_record:
