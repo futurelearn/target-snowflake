@@ -9,6 +9,7 @@ from target_snowflake.target_snowflake import TargetSnowflake
 from target_snowflake.utils.snowflake_helpers import (
     schema_exists,
     drop_snowflake_schema,
+    drop_snowflake_table
 )
 from target_snowflake.utils.error import SchemaUpdateError
 
@@ -100,6 +101,9 @@ class TestTargetSnowflake:
 
     @pytest.mark.slow
     def test_camelcase(self, config, snowflake_engine):
+        # check if the schema is a new one, ... etc ..
+        new_schema = not schema_exists(snowflake_engine, config["schema"])
+
         # The expected results to compare
         expected_results = {
             "state": None,
@@ -124,9 +128,16 @@ class TestTargetSnowflake:
             item_result = connection.execute(item_query).fetchone()
             assert item_result[0] == "Gitter Windows Desktop App"
 
-        drop_snowflake_schema(
-            snowflake_engine, config["database"], config["schema"]
+        # Drop the Test Table
+        drop_snowflake_table(
+            snowflake_engine, config["database"], config["schema"], "test_camelcase"
         )
+
+        # Drop the Schema if we created it
+        if new_schema:
+            drop_snowflake_schema(
+                snowflake_engine, config["database"], config["schema"]
+            )
 
 
     @pytest.mark.slow
