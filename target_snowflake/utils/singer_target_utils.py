@@ -37,7 +37,8 @@ def generate_sqlalchemy_table(stream, key_properties, json_schema, timestamp_col
         column = Column(timestamp_column, TIMESTAMP)
         columns.append(column)
 
-    table = Table(stream, MetaData(), *columns)
+    table_name = inflection.underscore(stream)
+    table = Table(table_name, MetaData(), *columns)
 
     return table
 
