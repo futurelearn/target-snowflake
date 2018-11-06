@@ -37,7 +37,9 @@ def generate_sqlalchemy_table(stream, key_properties, json_schema, timestamp_col
         column = Column(timestamp_column, TIMESTAMP)
         columns.append(column)
 
-    table_name = inflection.underscore(stream)
+    # Replace all special characters and CamelCase with underscores
+    table_name = re.sub('[^0-9a-zA-Z_]+', '_', stream)
+    table_name = inflection.underscore(table_name)
     table = Table(table_name, MetaData(), *columns)
 
     return table
@@ -46,6 +48,8 @@ def generate_sqlalchemy_table(stream, key_properties, json_schema, timestamp_col
 def inflect_column_name(name):
     name = re.sub(r"([A-Z]+)_([A-Z][a-z])", r"\1__\2", name)
     name = re.sub(r"([a-z\d])_([A-Z])", r"\1__\2", name)
+    # Also replace all special characters and CamelCase with underscores
+    name = re.sub('[^0-9a-zA-Z_]+', '_', name)
     return inflection.underscore(name)
 
 

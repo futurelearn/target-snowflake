@@ -139,6 +139,27 @@ class TestTargetSnowflake:
                 snowflake_engine, config["database"], config["schema"]
             )
 
+    @pytest.mark.slow
+    def test_special_chars_in_attributes(self, config, snowflake_engine):
+        # The expected results to compare
+        expected_results = {
+            "state": None,
+            "tables": ["test_special_chars_in_attributes"],
+            "columns": {
+                "test_special_chars_in_attributes": [
+                    "_id",
+                    "d__env",
+                    "d__agent_type",
+                    "d__agent_os_version",
+                    config["timestamp_column"],
+                ]
+            },
+            "total_records": {"test_special_chars_in_attributes": 1},
+        }
+
+        test_stream = "special_chars_in_attributes.stream"
+
+        self.integration_test(config, snowflake_engine, expected_results, test_stream)
 
     @pytest.mark.slow
     def test_optional_attributes(self, config, snowflake_engine):
