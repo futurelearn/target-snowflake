@@ -144,6 +144,54 @@ class TestTargetSnowflake:
 
         self.integration_test(config, snowflake_engine, expected_results, test_stream)
 
+    @pytest.mark.slow
+    def test_multiple_state_messages(self, capsys, config, snowflake_engine):
+        # The expected results to compare
+        expected_results = {
+            "state": {
+                "test_multiple_state_messages_a": 5,
+                "test_multiple_state_messages_b": 6,
+            },
+            "tables": [
+                "test_multiple_state_messages_a",
+                "test_multiple_state_messages_b",
+            ],
+            "columns": {
+                "test_multiple_state_messages_a": [
+                    "id",
+                    "metric",
+                    config["timestamp_column"],
+                ],
+                "test_multiple_state_messages_b": [
+                    "id",
+                    "metric",
+                    config["timestamp_column"],
+                ],
+            },
+            "total_records": {
+                "test_multiple_state_messages_a": 6,
+                "test_multiple_state_messages_b": 6,
+            },
+        }
+
+        test_stream = "multiple_state_messages.stream"
+
+        updated_config = {**config, "batch_size": 3}
+        self.integration_test(
+            updated_config, snowflake_engine, expected_results, test_stream
+        )
+
+        # Check that the expected State messages where flushed
+        expected_stdout = [
+            '{"type": "STATE", "value": {"test_multiple_state_messages_a": 1, "test_multiple_state_messages_b": 0}}',
+            '{"type": "STATE", "value": {"test_multiple_state_messages_a": 3, "test_multiple_state_messages_b": 2}}',
+            '{"type": "STATE", "value": {"test_multiple_state_messages_a": 5, "test_multiple_state_messages_b": 6}}',
+            "",
+        ]
+
+        captured = capsys.readouterr()
+        assert captured.out == "\n".join(expected_stdout)
+
     def test_schema_update_with_invalid_type_change(self, config, snowflake_engine):
         # Before running any integration test, check if the schema defined in
         #  the config is a new one (i.e. drop it afterwards)
@@ -337,7 +385,7 @@ class TestTargetSnowflake:
         target.flush_all_cached_records()
 
         # Check that the final state is the expected one
-        assert target.state == expected["state"]
+        assert target.last_emitted_state == expected["state"]
 
         # Check that the requested schema has been created
         inspector = inspect(snowflake_engine)
