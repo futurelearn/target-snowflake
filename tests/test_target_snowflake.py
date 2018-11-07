@@ -70,7 +70,7 @@ class TestTargetSnowflake:
         with pytest.raises(ValidationError) as excinfo:
             for line in stream:
                 target.process_line(line)
-        assert "is missing key property id" in str(excinfo.value)
+        assert "id" in str(excinfo.value)
 
         # Drop the Test Tables
         for stream, loader in target.loaders.items():
@@ -507,7 +507,6 @@ class TestTargetSnowflake:
         test_stream = "encoded_strings.stream"
 
         self.integration_test(config, snowflake_engine, expected_results, test_stream)
-
 
     def integration_test(
         self, config, snowflake_engine, expected, stream_file, drop_schema=True
