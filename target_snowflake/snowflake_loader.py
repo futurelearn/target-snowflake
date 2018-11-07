@@ -76,6 +76,12 @@ class SnowflakeLoader:
         """
         return f'"{self.database}"."{self.table.schema}"."{self.table.name.upper()}"'
 
+    def attribute_names(self) -> List[str]:
+        """
+        Get the attribute(column) names for the associated Table
+        """
+        return [column.name for column in self.table.columns]
+
     def empty_record(self) -> Dict:
         """
         Get a dictionary representing an empty (all attributes None) record for
