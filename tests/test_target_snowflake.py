@@ -46,6 +46,16 @@ class TestTargetSnowflake:
                 target.process_line(line)
         assert "encountered before a corresponding schema" in str(excinfo.value)
 
+    def test_invalid_schema(self, config):
+        test_stream = "invalid_schema.stream"
+        target = TargetSnowflake(config)
+        stream = load_stream(test_stream)
+
+        with pytest.raises(ValidationError) as excinfo:
+            for line in stream:
+                target.process_line(line)
+        assert "Not supported schema" in str(excinfo.value)
+
     def test_record_missing_key_property(self, config, snowflake_engine):
         # Before running any integration test, check if the schema defined in
         #  the config is a new one (i.e. drop it afterwards)

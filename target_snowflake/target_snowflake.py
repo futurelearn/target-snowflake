@@ -118,7 +118,7 @@ class TargetSnowflake:
         # It is used while flattening records in order to know when an attribute
         #  is defined as an Object (i.e. semistructured data type) and its values
         #  must be stored as they are without further unnesting them.
-        self.attributes: Dict = {}
+        self.entity_attributes: Dict = {}
 
         # The key_properties has the keys for each stream to enable quick
         #  lookups during schema validation of each received record
@@ -171,7 +171,7 @@ class TargetSnowflake:
             self.schema_validation(stream, o["record"], self.key_properties[stream])
 
             # Flatten the record
-            flat_record = flatten_record(o["record"], self.attributes[stream])
+            flat_record = flatten_record(o["record"], self.entity_attributes[stream])
 
             # Add an `timestamp_column` timestamp for the record
             if self.timestamp_column not in flat_record:
@@ -205,6 +205,17 @@ class TargetSnowflake:
                 )
 
             stream = o["stream"]
+
+            # Reject the valid JSON schema with no properties.
+            # Snowflake Target has to map any input to a relational schema,
+            #  which means that at least one attribute, even if it is a
+            #  semistructured object, must be present in order to populate
+            #  the relational table to be created.
+            if "properties" not in o["schema"]:
+                raise ValidationError(
+                    f"Not supported schema by target-snowflake:\n {line}\n" + \
+                    "It should at least have one top level property in schema."
+                )
 
             if stream in self.schemas:
                 # We received a new Schema message for a stream that already
@@ -272,7 +283,7 @@ class TargetSnowflake:
 
             # And also keep the attributes of the database Table associated
             #  with this stream
-            self.attributes[stream] = loader.attribute_names()
+            self.entity_attributes[stream] = loader.attribute_names()
         elif t == "ACTIVATE_VERSION":
             # No support for that type of message yet
             LOGGER.warn("ACTIVATE_VERSION message")
