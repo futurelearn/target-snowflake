@@ -9,7 +9,7 @@ from target_snowflake.target_snowflake import TargetSnowflake
 from target_snowflake.utils.snowflake_helpers import (
     schema_exists,
     drop_snowflake_schema,
-    drop_snowflake_table
+    drop_snowflake_table,
 )
 from target_snowflake.utils.error import SchemaUpdateError
 
@@ -45,6 +45,16 @@ class TestTargetSnowflake:
             for line in stream:
                 target.process_line(line)
         assert "encountered before a corresponding schema" in str(excinfo.value)
+
+    def test_invalid_schema(self, config):
+        test_stream = "invalid_schema.stream"
+        target = TargetSnowflake(config)
+        stream = load_stream(test_stream)
+
+        with pytest.raises(ValidationError) as excinfo:
+            for line in stream:
+                target.process_line(line)
+        assert "Not supported schema" in str(excinfo.value)
 
     def test_record_missing_key_property(self, config, snowflake_engine):
         # Before running any integration test, check if the schema defined in
@@ -109,18 +119,16 @@ class TestTargetSnowflake:
             "state": None,
             "tables": ["test_camelcase"],
             "columns": {
-                "test_camelcase": [
-                    "id",
-                    "client_name",
-                    config["timestamp_column"],
-                ]
+                "test_camelcase": ["id", "client_name", config["timestamp_column"]]
             },
             "total_records": {"test_camelcase": 2},
         }
 
         test_stream = "camelcase.stream"
 
-        self.integration_test(config, snowflake_engine, expected_results, test_stream, False)
+        self.integration_test(
+            config, snowflake_engine, expected_results, test_stream, drop_schema=False
+        )
 
         # We also need to test that the record has data in the camelcased field
         with snowflake_engine.connect() as connection:
@@ -180,6 +188,75 @@ class TestTargetSnowflake:
         test_stream = "optional_attributes.stream"
 
         self.integration_test(config, snowflake_engine, expected_results, test_stream)
+
+    @pytest.mark.slow
+    def test_schema_no_properties(self, config, snowflake_engine):
+        # check if the schema is a new one, ... etc ..
+        new_schema = not schema_exists(snowflake_engine, config["schema"])
+
+        # The expected results to compare
+        expected_results = {
+            "state": None,
+            "tables": [
+                "test_object_schema_with_properties",
+                "test_object_schema_no_properties",
+            ],
+            "columns": {
+                "test_object_schema_with_properties": [
+                    "object_store__id",
+                    "object_store__metric",
+                    config["timestamp_column"],
+                ],
+                "test_object_schema_no_properties": [
+                    "object_store",
+                    config["timestamp_column"],
+                ],
+            },
+            "total_records": {
+                "test_object_schema_with_properties": 2,
+                "test_object_schema_no_properties": 2,
+            },
+        }
+
+        test_stream = "schema_no_properties.stream"
+
+        self.integration_test(
+            config, snowflake_engine, expected_results, test_stream, drop_schema=False
+        )
+
+        # We also need to test that the proper data records were stored
+        with snowflake_engine.connect() as connection:
+            query = "SELECT COUNT(*) "  + \
+                f" FROM {config['schema']}.test_object_schema_with_properties "  + \
+                " WHERE object_store__id = 1 AND object_store__metric = 187"
+            result = connection.execute(query).fetchone()
+            assert result[0] == 1
+
+            query = "SELECT COUNT(*) "  + \
+                f" FROM {config['schema']}.test_object_schema_no_properties "  + \
+                " WHERE object_store = '{\\'id\\': 1, \\'metric\\': 1}'"
+            result = connection.execute(query).fetchone()
+            assert result[0] == 1
+
+        # Drop the Test Table
+        drop_snowflake_table(
+            snowflake_engine,
+            config["database"],
+            config["schema"],
+            "test_object_schema_with_properties",
+        )
+        drop_snowflake_table(
+            snowflake_engine,
+            config["database"],
+            config["schema"],
+            "test_object_schema_no_properties",
+        )
+
+        # Drop the Schema if we created it
+        if new_schema:
+            drop_snowflake_schema(
+                snowflake_engine, config["database"], config["schema"]
+            )
 
     @pytest.mark.slow
     def test_schema_updates(self, config, snowflake_engine):
@@ -464,9 +541,14 @@ class TestTargetSnowflake:
                 assert table in all_table_names
 
                 # Check that the Table created has the requested attributes
+                db_columns = []
                 columns = inspector.get_columns(table, schema=config["schema"])
                 for column in columns:
+                    db_columns.append(column["name"].lower())
                     assert column["name"].lower() in expected["columns"][table]
+
+                for column in expected["columns"][table]:
+                    assert column in db_columns
 
                 # Check that the correct number of rows were inserted
                 query = f"SELECT COUNT(*) FROM {config['schema']}.{table}"

@@ -10,8 +10,9 @@ from snowflake.sqlalchemy import ARRAY, OBJECT
 
 # Set of helper functions for flattening records and schemas.
 # The core ones are:
-# + flatten_record(record) --> flatten a given data record.
-#  e.g. {"id": 3, "info": {"weather": "sunny", "mood": "happy"}}}
+# + flatten_record(record, schema)
+#   Flatten (un-nest) a given data record according to a schema.
+#   e.g. {"id": 3, "info": {"weather": "sunny", "mood": "happy"}}}
 #     --> {"id": 3, "info__weather": "sunny", "info__mood": "happy"}
 # + flatten_schema(json_schema_definition) --> flatten a given json schema.
 # + generate_sqlalchemy_table(stream, key_properties, json_schema, timestamp_column)
@@ -69,12 +70,21 @@ def flatten_key(k, parent_key, sep):
     return sep.join(inflected_key)
 
 
-def flatten_record(d, parent_key=[], sep="__"):
+def flatten_record(d, schema, parent_key=[], sep="__"):
     items = []
     for k, v in d.items():
         new_key = flatten_key(k, parent_key, sep)
-        if isinstance(v, collections.MutableMapping):
-            items.extend(flatten_record(v, parent_key + [k], sep=sep).items())
+
+        if new_key in schema:
+            # If the attribute name (new_key) is defined in the schema
+            # Then stop un-nesting and store its values as they are even if
+            #  it is an object
+            if isinstance(v, collections.MutableMapping) or type(v) is list:
+                items.append((new_key, str(v)))
+            else:
+                items.append((new_key, v))
+        elif isinstance(v, collections.MutableMapping):
+            items.extend(flatten_record(v, schema, parent_key + [k], sep=sep).items())
         else:
             items.append((new_key, str(v) if type(v) is list else v))
     return dict(items)
@@ -82,26 +92,34 @@ def flatten_record(d, parent_key=[], sep="__"):
 
 def flatten_schema(d, parent_key=[], sep="__"):
     items = []
-    for k, v in d["properties"].items():
-        new_key = flatten_key(k, parent_key, sep)
+    if "properties" in d.keys():
+        for k, v in d["properties"].items():
+            new_key = flatten_key(k, parent_key, sep)
 
-        if not v:
-            logger.warn("Empty definition for {}.".format(new_key))
-            continue
+            if not v:
+                logger.warn("Empty definition for {}.".format(new_key))
+                continue
 
-        if "type" in v.keys():
-            if "object" in v["type"]:
-                items.extend(flatten_schema(v, parent_key + [k], sep=sep).items())
+            if "type" in v.keys():
+                if "object" in v["type"]:
+                    # Additional check that objects without properties are allowed
+                    if "properties" in v.keys():
+                        items.extend(
+                            flatten_schema(v, parent_key + [k], sep=sep).items()
+                        )
+                    else:
+                        # An object without properties (for semistructured data)
+                        items.append((new_key, v))
+                else:
+                    items.append((new_key, v))
             else:
-                items.append((new_key, v))
-        else:
-            property = list(v.values())[0][0]
-            if property["type"] == "string":
-                property["type"] = ["null", "string"]
-                items.append((new_key, property))
-            elif property["type"] == "array":
-                property["type"] = ["null", "array"]
-                items.append((new_key, property))
+                property = list(v.values())[0][0]
+                if property["type"] == "string":
+                    property["type"] = ["null", "string"]
+                    items.append((new_key, property))
+                elif property["type"] == "array":
+                    property["type"] = ["null", "array"]
+                    items.append((new_key, property))
 
     key_func = lambda item: item[0]
     sorted_items = sorted(items, key=key_func)

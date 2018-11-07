@@ -113,6 +113,13 @@ class TargetSnowflake:
         #  fully defined schema
         self.template_records: Dict = {}
 
+        # Finaly, keep the attributes of the database Table associated with
+        #  each stream for quick lookups.
+        # It is used while flattening records in order to know when an attribute
+        #  is defined as an Object (i.e. semistructured data type) and its values
+        #  must be stored as they are without further unnesting them.
+        self.entity_attributes: Dict = {}
+
         # The key_properties has the keys for each stream to enable quick
         #  lookups during schema validation of each received record
         #  (all keys should be there even if they are not marked as required)
@@ -164,7 +171,7 @@ class TargetSnowflake:
             self.schema_validation(stream, o["record"], self.key_properties[stream])
 
             # Flatten the record
-            flat_record = flatten_record(o["record"])
+            flat_record = flatten_record(o["record"], self.entity_attributes[stream])
 
             # Add an `timestamp_column` timestamp for the record
             if self.timestamp_column not in flat_record:
@@ -198,6 +205,17 @@ class TargetSnowflake:
                 )
 
             stream = o["stream"]
+
+            # Reject the valid JSON schema with no properties.
+            # Snowflake Target has to map any input to a relational schema,
+            #  which means that at least one attribute, even if it is a
+            #  semistructured object, must be present in order to populate
+            #  the relational table to be created.
+            if "properties" not in o["schema"]:
+                raise ValidationError(
+                    f"Not supported schema by target-snowflake:\n {line}\n" + \
+                    "It should at least have one top level property in schema."
+                )
 
             if stream in self.schemas:
                 # We received a new Schema message for a stream that already
@@ -245,7 +263,6 @@ class TargetSnowflake:
                 )
                 raise exc
 
-
             # This buffering makes sure that if we receive multiple rows that
             #  would violate the `key_properties` uniqueness,
             #  only the last one will be kept.
@@ -261,8 +278,12 @@ class TargetSnowflake:
             self.template_records[stream] = loader.empty_record()
 
             # Keep the loader in loaders[stream] to be used for loading the
-            #  records received for that stream.
+            #  records received for this stream.
             self.loaders[stream] = loader
+
+            # And also keep the attributes of the database Table associated
+            #  with this stream
+            self.entity_attributes[stream] = loader.attribute_names()
         elif t == "ACTIVATE_VERSION":
             # No support for that type of message yet
             LOGGER.warn("ACTIVATE_VERSION message")
