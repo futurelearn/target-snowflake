@@ -8,6 +8,7 @@ from typing import Dict, List, Iterator
 
 from target_snowflake.utils.singer_target_utils import (
     flatten_record,
+    flatten_key,
     generate_sqlalchemy_table,
 )
 from target_snowflake.snowflake_loader import SnowflakeLoader
@@ -71,9 +72,7 @@ class StateBuffer:
 
     def flush_stream(self, stream: str) -> None:
         for state in self.buffer:
-            state["streams"] = [x
-                                for x in state["streams"]
-                                if x != stream]
+            state["streams"] = [x for x in state["streams"] if x != stream]
 
     def pop_states_without_streams(self) -> List[str]:
         states = [state["state"] for state in self.buffer if not state["streams"]]
@@ -168,10 +167,9 @@ class TargetSnowflake:
                 )
 
             # Validate record against the schema for that stream
-            self.schema_validation(stream, o["record"], self.key_properties[stream])
-
-            # Flatten the record
-            flat_record = flatten_record(o["record"], self.entity_attributes[stream])
+            flat_record = self.validate_record(
+                stream, o["record"], self.key_properties[stream]
+            )
 
             # Add an `timestamp_column` timestamp for the record
             if self.timestamp_column not in flat_record:
@@ -238,7 +236,8 @@ class TargetSnowflake:
             if "key_properties" not in o:
                 raise Exception("key_properties field is required")
 
-            key_properties = o["key_properties"]
+            # We have to process the `key_properties` like all columns
+            key_properties = [flatten_key(prop, [], "") for prop in o["key_properties"]]
 
             # Store the Key properties for quick lookups during record validation
             self.key_properties[stream] = key_properties
@@ -292,7 +291,7 @@ class TargetSnowflake:
                 "Unknown message type {} in message {}".format(o["type"], o)
             )
 
-    def schema_validation(self, stream: str, record: Dict, keys: List) -> None:
+    def validate_record(self, stream: str, record: Dict, keys: List) -> Dict:
         """
         Validate a record against the schema for its stream
 
@@ -300,15 +299,19 @@ class TargetSnowflake:
         1. The record follows the JSON schema of the SCHEMA message
         2. All the keys are present even if they are not market as required in
              the JSON schema
+
+        Returns the flattened record ready for integration
         """
         self.validators[stream].validate(record)
+        flat_record = flatten_record(record, self.entity_attributes[stream])
+        missing_keys = [key for key in keys if key not in flat_record]
 
-        if not keys:
-            return
+        if missing_keys:
+            raise ValidationError(
+                f"Record {record} is missing key properties {missing_keys}"
+            )
 
-        for key in keys:
-            if key not in record:
-                raise ValidationError(f"Record {record} is missing key property {key}")
+        return flat_record
 
     def flush_all_cached_records(self) -> None:
         """
