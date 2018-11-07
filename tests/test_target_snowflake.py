@@ -512,59 +512,60 @@ class TestTargetSnowflake:
     def integration_test(
         self, config, snowflake_engine, expected, stream_file, drop_schema=True
     ):
-        # check if the schema is a new one, ... etc ..
-        new_schema = not schema_exists(snowflake_engine, config["schema"])
+        try:
+            # check if the schema is a new one, ... etc ..
+            new_schema = not schema_exists(snowflake_engine, config["schema"])
 
-        # Create the TargetSnowflake and fully run it using the user_location_data
-        target = TargetSnowflake(config)
+            # Create the TargetSnowflake and fully run it using the user_location_data
+            target = TargetSnowflake(config)
 
-        stream = load_stream(stream_file)
+            stream = load_stream(stream_file)
 
-        for line in stream:
-            target.process_line(line)
+            for line in stream:
+                target.process_line(line)
 
-        target.flush_all_cached_records()
+            target.flush_all_cached_records()
 
-        # Check that the final state is the expected one
-        assert target.last_emitted_state == expected["state"]
+            # Check that the final state is the expected one
+            assert target.last_emitted_state == expected["state"]
 
-        # Check that the requested schema has been created
-        inspector = inspect(snowflake_engine)
-        all_schema_names = inspector.get_schema_names()
-        assert config["schema"].lower() in all_schema_names
+            # Check that the requested schema has been created
+            inspector = inspect(snowflake_engine)
+            all_schema_names = inspector.get_schema_names()
+            assert config["schema"].lower() in all_schema_names
 
-        all_table_names = inspector.get_table_names(config["schema"])
+            all_table_names = inspector.get_table_names(config["schema"])
 
-        with snowflake_engine.connect() as connection:
-            for table in expected["tables"]:
-                # Check that the Table has been created in Snowflake
-                assert table in all_table_names
+            with snowflake_engine.connect() as connection:
+                for table in expected["tables"]:
+                    # Check that the Table has been created in Snowflake
+                    assert table in all_table_names
 
-                # Check that the Table created has the requested attributes
-                db_columns = []
-                columns = inspector.get_columns(table, schema=config["schema"])
-                for column in columns:
-                    db_columns.append(column["name"].lower())
-                    assert column["name"].lower() in expected["columns"][table]
+                    # Check that the Table created has the requested attributes
+                    db_columns = []
+                    columns = inspector.get_columns(table, schema=config["schema"])
+                    for column in columns:
+                        db_columns.append(column["name"].lower())
+                        assert column["name"].lower() in expected["columns"][table]
 
-                for column in expected["columns"][table]:
-                    assert column in db_columns
+                    for column in expected["columns"][table]:
+                        assert column in db_columns
 
-                # Check that the correct number of rows were inserted
-                query = f"SELECT COUNT(*) FROM {config['schema']}.{table}"
+                    # Check that the correct number of rows were inserted
+                    query = f"SELECT COUNT(*) FROM {config['schema']}.{table}"
 
-                results = connection.execute(query).fetchone()
-                assert results[0] == expected["total_records"][table]
+                    results = connection.execute(query).fetchone()
+                    assert results[0] == expected["total_records"][table]
+        finally:
+            # Drop the Test Tables
+            if drop_schema:
+                for stream, loader in target.loaders.items():
+                    loader.table.drop(loader.engine)
 
-        # Drop the Test Tables
-        if drop_schema:
-            for stream, loader in target.loaders.items():
-                loader.table.drop(loader.engine)
-
-        # Drop the Schema if we created it and there is nothing left there
-        inspector = inspect(snowflake_engine)
-        all_table_names = inspector.get_table_names(config["schema"])
-        if drop_schema and new_schema and (len(all_table_names) == 0):
-            drop_snowflake_schema(
-                snowflake_engine, config["database"], config["schema"]
-            )
+            # Drop the Schema if we created it and there is nothing left there
+            inspector = inspect(snowflake_engine)
+            all_table_names = inspector.get_table_names(config["schema"])
+            if drop_schema and new_schema and (len(all_table_names) == 0):
+                drop_snowflake_schema(
+                    snowflake_engine, config["database"], config["schema"]
+                )
