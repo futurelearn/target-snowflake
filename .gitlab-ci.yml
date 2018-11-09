@@ -19,7 +19,7 @@ test:
   script:
     - pip install -e '.[dev]'
     - python target_snowflake/utils/config_generator.py
-    - pytest --config config.json tests/
+    - pytest -vv --config config.json tests/
   tags:
     - docker
     - shared
