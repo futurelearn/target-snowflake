@@ -1,0 +1,25 @@
+image: python:3.6
+
+variables:
+  # SF_ACCOUNT
+  # SF_USER
+  # SF_PASSWORD
+  # SF_ROLE
+  # SF_DATABASE
+  # SF_TEST_SCHEMA
+  # SF_WAREHOUSE
+
+
+stages:
+  - test
+
+
+test:
+  stage: test
+  script:
+    - pip install -e '.[dev]'
+    - python target_snowflake/utils/config_generator.py
+    - pytest -vv --config config.json tests/
+  tags:
+    - docker
+    - shared
