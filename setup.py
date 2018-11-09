@@ -18,7 +18,8 @@ setup(
         'inflection>=0.3.1',
         'singer-python>=5.0.12',
         'snowflake-connector-python',
-        'snowflake-sqlalchemy>=1.1.2',
+        # see https://gitlab.com/meltano/target-snowflake/issues/9
+        'snowflake-sqlalchemy==1.1.2',
     ],
     extras_require={
         'dev': [
@@ -32,6 +33,6 @@ setup(
     """,
     python_requires='>=3.6',
     packages=find_packages(exclude=['tests']),
-    package_data = {},
+    package_data={},
     include_package_data=True,
 )
