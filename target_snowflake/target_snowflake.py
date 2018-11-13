@@ -211,7 +211,7 @@ class TargetSnowflake:
             #  the relational table to be created.
             if "properties" not in o["schema"]:
                 raise ValidationError(
-                    f"Not supported schema by target-snowflake:\n {line}\n" + \
+                    f"Not supported schema by target-snowflake:\n {line}\n"
                     "It should at least have one top level property in schema."
                 )
 

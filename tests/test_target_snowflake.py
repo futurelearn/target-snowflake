@@ -226,15 +226,19 @@ class TestTargetSnowflake:
 
         # We also need to test that the proper data records were stored
         with snowflake_engine.connect() as connection:
-            query = "SELECT COUNT(*) "  + \
-                f" FROM {config['schema']}.test_object_schema_with_properties "  + \
+            query = (
+                "SELECT COUNT(*) "
+                f" FROM {config['schema']}.test_object_schema_with_properties "
                 " WHERE object_store__id = 1 AND object_store__metric = 187"
+            )
             result = connection.execute(query).fetchone()
             assert result[0] == 1
 
-            query = "SELECT COUNT(*) "  + \
-                f" FROM {config['schema']}.test_object_schema_no_properties "  + \
+            query = (
+                "SELECT COUNT(*) "
+                f" FROM {config['schema']}.test_object_schema_no_properties "
                 " WHERE object_store = '{\\'id\\': 1, \\'metric\\': 1}'"
+            )
             result = connection.execute(query).fetchone()
             assert result[0] == 1
 
