@@ -5,6 +5,7 @@ import pytest
 class SilencedDict(dict):
     def __repr__(self):
         return "Dict[ ... sensitive_data ... ]"
+
     def __str__(self):
         return "Dict[ ... sensitive_data ... ]"
 

@@ -1,10 +1,13 @@
 import os
 import logging
+import functools
 
 from typing import Dict, List
 from sqlalchemy import create_engine, inspect, Table
 from sqlalchemy.schema import CreateSchema
 from snowflake.sqlalchemy import URL
+from snowflake.connector.errors import ProgrammingError
+from snowflake.connector.network import ReauthenticationRequest
 
 from target_snowflake.utils.error import SchemaUpdateError
 
@@ -47,6 +50,73 @@ ALLOWED_TYPE_TRANSITIONS = [
 ]
 
 
+# How many times are we going to try to run functions with
+# @handle_token_expiration when they raise exceptions.
+TokenExpirationMaxTries = 2
+
+
+def handle_token_expiration(func):
+    """
+    Wrap SnowflakeLoader methods in order to catch token expiration errors,
+    refresh the engine and retry.
+
+    If the session stays idle for 4 hours, then the master token that
+    snowflake.sqlalchemy has stored expires and a new session token can not be
+    automatically renewed.
+
+    In that case, the following exceptions are raised:
+    snowflake.connector.errors.ProgrammingError: 390114 (08001)
+    snowflake.connector.network.ReauthenticationRequest: 390114 (08001)
+    Authentication token has expired. The user must authenticate again.
+
+    We only retry once:
+    The first try is the normal excecution that will fail if 4 hours have passed
+    since the last query.
+    The second try follows a refresh_engine() and should succeed.
+    If it fails again, then something else happens and we should stop the execution
+    and report the error.
+    """
+
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        last_exception = None
+
+        for retry in range(TokenExpirationMaxTries):
+            try:
+                return func(self, *args, **kwargs)
+            except (ProgrammingError, ReauthenticationRequest) as exc:
+                if "390114" in str(exc):
+                    last_exception = exc
+                    self.refresh_engine()
+                else:
+                    raise exc
+
+        # If we tried TokenExpirationMaxTries times and we keep on getting errors,
+        #  just stop trying and raise the last exception caught
+        raise last_exception
+
+    return wrapper
+
+
+class SnowflakeEngineFactory:
+    def __init__(self, config: Dict) -> None:
+        # Keep the config in the EngineFactory in order to be able to refresh
+        #  the engine if the master token expires
+        self._config = config
+
+    def create_engine(self):
+        return create_engine(
+            URL(
+                user=self._config["username"],
+                password=self._config["password"],
+                account=self._config["account"],
+                database=self._config["database"],
+                role=self._config["role"],
+                warehouse=self._config["warehouse"],
+            )
+        )
+
+
 class SnowflakeLoader:
     def __init__(self, table: Table, config: Dict) -> None:
         self.table = table
@@ -55,19 +125,21 @@ class SnowflakeLoader:
         #  on wich schema we want to use (defined in config)
         self.table.schema = config["schema"]
 
+        # Keep the database name and the role name as they are required
+        #  for granting privileges to new entities.
         self.database = config["database"]
         self.role = config["role"]
 
-        self.engine = create_engine(
-            URL(
-                user=config["username"],
-                password=config["password"],
-                account=config["account"],
-                database=config["database"],
-                role=config["role"],
-                warehouse=config["warehouse"],
-            )
-        )
+        # Create a SnowflakeEngineFactory with the provided config
+        #  and use it to generate a new engine for connecting to Snowflake
+        self._engine_factory = SnowflakeEngineFactory(config)
+        self.engine = self._engine_factory.create_engine()
+
+    def refresh_engine(self) -> None:
+        if self.engine:
+            self.engine.dispose()
+
+        self.engine = self._engine_factory.create_engine()
 
     def quoted_table_name(self) -> str:
         """
@@ -99,6 +171,7 @@ class SnowflakeLoader:
         """
         return dict.fromkeys(column.name for column in self.table.columns)
 
+    @handle_token_expiration
     def schema_apply(self) -> None:
         """
         Apply the schema defined for self.table to the Database we connect to
@@ -195,6 +268,7 @@ class SnowflakeLoader:
         with self.engine.connect() as connection:
             connection.execute(alter_stmt)
 
+    @handle_token_expiration
     def load(self, data: List[Dict]) -> None:
         """
         Load the data provided as a list of dictionaries to the given Table
