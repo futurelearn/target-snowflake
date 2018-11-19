@@ -225,6 +225,13 @@ class TargetSnowflake:
         t = o["type"]
         now = datetime.utcnow()
 
+        # flush expired buffers
+        for stream in (
+            stream for stream, buffer in self.rows.items() if buffer.expired(at=now)
+        ):
+            LOGGER.info("{stream}: buffer has expired, flushing.")
+            self.flush_records(stream)
+
         if t == "RECORD":
             if "stream" not in o:
                 raise Exception(
@@ -257,13 +264,6 @@ class TargetSnowflake:
 
             # If the batch_size has been reached for this stream, flush the records
             if len(self.rows[stream]) >= self.batch_size:
-                self.flush_records(stream)
-
-            # flush expired buffers
-            for stream in (
-                stream for stream, buffer in self.rows.items() if buffer.expired(at=now)
-            ):
-                LOGGER.info("{stream}: buffer has expired, flushing.")
                 self.flush_records(stream)
         elif t == "STATE":
             new_state = o["value"]
