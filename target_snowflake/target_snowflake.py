@@ -1,10 +1,11 @@
 import json
 import singer
 import sys
+import threading
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from jsonschema import ValidationError, Draft4Validator, FormatChecker
-from typing import Dict, List, Iterator
+from typing import Dict, List, Iterator, Optional
 
 from target_snowflake.utils.singer_target_utils import (
     flatten_record,
@@ -15,21 +16,85 @@ from target_snowflake.snowflake_loader import SnowflakeLoader
 
 
 LOGGER = singer.get_logger()
+BUFFER_TTL = 60
+
+
+class Expires:
+    """
+    Abstracts a process that expires in the future.
+
+    expire = Expire(60)  # in 60s
+    expire.expires_at → 1542400508.5480127  # Unix timestamp
+
+    expire.rearm(60)
+    expire.expires_at → 1542400568.5480127
+    """
+
+    def __init__(self, ttl: int, armed=True):
+        self._ttl = ttl
+        self._expires_at = datetime.utcnow().timestamp() + ttl
+        self._armed = armed
+
+    @property
+    def expires_at(self):
+        return self._expires_at
+
+    def expired(self, at: Optional[datetime] = None):
+        at = at or datetime.utcnow()
+
+        return self._armed and self.expires_at <= at.timestamp()
+
+    def disarm(self):
+        """Prevent the Expires to expired until `rearm` is called."""
+        self._armed = False
+
+    def rearm(self, ttl: Optional[int] = None) -> int:
+        """
+        Re-arms the Expires to `now + ttl`.
+
+        Returns: the new expiry timestamp
+        """
+        ttl = ttl if ttl is not None else self._ttl
+        expires_at = datetime.utcnow() + timedelta(seconds=ttl)
+        return self.rearm_at(expires_at)
+
+    def rearm_at(self, at: datetime) -> int:
+        """
+        Re-arms the Expires to `at`.
+
+        Returns: the new expiry timestamp
+        """
+        self._expires_at = at.timestamp()
+        self._armed = True
+
+        return self.expires_at
 
 
 class RecordBuffer(list):
+    def __init__(self):
+        self._expires = Expires(BUFFER_TTL, armed=False)
+
     def add_record(self, record: Dict):
+        self._expires.rearm()
         self.append(record)
 
     def values(self):
         return self
 
+    def expired(self, at: datetime = None):
+        return self._expires.expired(at=at)
+
+    def disarm(self):
+        self._expires.disarm()
+
 
 class UniqueRecordBuffer(dict):
     def __init__(self, key_func=lambda x: x):
         self.key = key_func
+        self._expires = Expires(BUFFER_TTL, armed=False)
 
     def add_record(self, record: Dict):
+        self._expires.rearm()
         self[self.key(record)] = record
 
     def values(self):
@@ -38,6 +103,12 @@ class UniqueRecordBuffer(dict):
     def __iter__(self):
         for record in self.values():
             yield record
+
+    def expired(self, at: int = None):
+        return self._expires.expired(at=at)
+
+    def disarm(self):
+        self._expires.disarm()
 
 
 class StateBuffer:
@@ -150,7 +221,9 @@ class TargetSnowflake:
 
         if "type" not in o:
             raise Exception("Line is missing required key 'type': {}".format(line))
+
         t = o["type"]
+        now = datetime.utcnow()
 
         if t == "RECORD":
             if "stream" not in o:
@@ -173,7 +246,7 @@ class TargetSnowflake:
 
             # Add an `timestamp_column` timestamp for the record
             if self.timestamp_column not in flat_record:
-                flat_record[self.timestamp_column] = datetime.utcnow()
+                flat_record[self.timestamp_column] = now
 
             # Normalize the record to make sure it follows the full schema defined
             new_record = self.template_records[stream].copy()
@@ -291,6 +364,13 @@ class TargetSnowflake:
                 "Unknown message type {} in message {}".format(o["type"], o)
             )
 
+        # flush expired buffers
+        for stream in (
+            stream for stream, buffer in self.rows.items() if buffer.expired(at=now)
+        ):
+            LOGGER.info("{stream}: buffer has expired, flushing.")
+            self.flush_records(stream)
+
     def validate_record(self, stream: str, record: Dict, keys: List) -> Dict:
         """
         Validate a record against the schema for its stream
@@ -336,6 +416,7 @@ class TargetSnowflake:
 
         # Clear the cached records and reset the counter for the stream
         self.rows[stream].clear()
+        self.rows[stream].disarm()
 
         # Mark the stream as flushed in StateBuffer
         #  and check if there are any STATE messages ready to be also flushed
