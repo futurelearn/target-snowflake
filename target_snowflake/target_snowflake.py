@@ -68,7 +68,7 @@ class RecordBuffer(list):
     def __init__(self):
         self._expires = Expires(BUFFER_TTL, armed=False)
 
-    def add_record(self, stream: str, record: Dict):
+    def add_record(self, record: Dict):
         self._expires.rearm()
         self.append(record)
 
