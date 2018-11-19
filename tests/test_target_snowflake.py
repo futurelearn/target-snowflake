@@ -521,10 +521,13 @@ class TestTargetSnowflake:
         stream = load_stream("user_location_data.stream")
 
         with mock.patch.object(target, "flush_records") as flush_records:
+            message_count = 0
             for line in stream:
                 target.process_line(line)
+                message_count += 1
 
-            assert flush_records.call_count == 9
+            # flushed at every message
+            assert flush_records.call_count == message_count
 
     def integration_test(
         self, config, snowflake_engine, expected, stream_file, drop_schema=True
