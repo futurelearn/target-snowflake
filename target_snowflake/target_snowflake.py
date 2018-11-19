@@ -225,13 +225,6 @@ class TargetSnowflake:
         t = o["type"]
         now = datetime.utcnow()
 
-        # flush expired buffers
-        for stream in (
-            stream for stream, buffer in self.rows.items() if buffer.expired(at=now)
-        ):
-            LOGGER.info("{stream}: buffer has expired, flushing.")
-            self.flush_records(stream)
-
         if t == "RECORD":
             if "stream" not in o:
                 raise Exception(
@@ -370,6 +363,13 @@ class TargetSnowflake:
             raise Exception(
                 "Unknown message type {} in message {}".format(o["type"], o)
             )
+
+        # flush expired buffers
+        for stream in (
+            stream for stream, buffer in self.rows.items() if buffer.expired(at=now)
+        ):
+            LOGGER.info("{stream}: buffer has expired, flushing.")
+            self.flush_records(stream)
 
     def validate_record(self, stream: str, record: Dict, keys: List) -> Dict:
         """
