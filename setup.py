@@ -4,6 +4,7 @@ from setuptools import setup, find_packages
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+
 setup(
     name="target-snowflake",
     version="0.1.0",
@@ -25,6 +26,7 @@ setup(
         'dev': [
             'pytest>=3.8',
             'black>=18.3a0',
+            'freezegun'
         ]
     },
     entry_points="""

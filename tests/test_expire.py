@@ -2,20 +2,23 @@ import pytest
 from unittest import mock
 from datetime import datetime, timedelta
 
+from freezegun import freeze_time
 from target_snowflake.target_snowflake import Expires
 
 
+now = datetime.utcnow()
+
+
 class TestExpire:
-    @pytest.fixture(scope="class")
-    def now(self):
-        return datetime.utcnow()
-
     @pytest.fixture
-    def subject(self, now):
-        return Expires(10, at=now)  # expires in 1 second
+    def subject(self):
+        return Expires(10)  # expires in 1 second
 
-    def test_armed(self, subject, now):
+    @freeze_time(now)
+    def test_armed(self, subject):
         assert subject._armed
+
+        import pdb; pdb.set_trace()
 
         # disarming works
         subject.disarm()
@@ -26,20 +29,22 @@ class TestExpire:
         subject.rearm(5)
         assert subject._armed
 
-    def test_rearm(self, subject, now):
-        fixed_time = mock.Mock()
-        fixed_time.utcnow.return_value = now
-
+    @freeze_time(now)
+    def test_rearm(self, subject):
         assert not subject.expired()
 
+        import pdb; pdb.set_trace()
+
         # can set the TTL ad-hoc
-        subject.rearm(ttl=1, at=now)
+        subject.rearm(1)
         assert subject.expires_at == (now + timedelta(seconds=1)).timestamp()
         assert subject.expired(at=now + timedelta(seconds=2))
 
-        # or use the default TTL
-        subject.rearm(at=now)
-        assert subject.expires_at == (now + timedelta(seconds=10)).timestamp()
+        # or to a certain time
+        expires_at = now + timedelta(seconds=10)
+        subject.rearm_at(expires_at)
+        assert subject.expires_at == expires_at.timestamp()
 
-        subject.rearm(10)
+        # or use the default TTL
+        subject.rearm()
         assert subject.expires_at >= (now + timedelta(seconds=10)).timestamp()

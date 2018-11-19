@@ -30,9 +30,9 @@ class Expires:
     expire.expires_at → 1542400568.5480127
     """
 
-    def __init__(self, ttl: int, at: Optional[datetime] = None, armed=True):
+    def __init__(self, ttl: int, armed=True):
         self._ttl = ttl
-        self._expires_at = (at or datetime.utcnow()).timestamp() + ttl
+        self._expires_at = datetime.utcnow().timestamp() + ttl
         self._armed = armed
 
     @property
@@ -48,20 +48,27 @@ class Expires:
         """Prevent the Expires to expired until `rearm` is called."""
         self._armed = False
 
-    def rearm(self, ttl: Optional[int] = None, at: Optional[datetime] = None) -> int:
+    def rearm(self, ttl: Optional[int] = None) -> int:
         """
-        Re-arms the Expires and set it to expire at a given time.
+        Re-arms the Expires to `now + ttl`.
 
         Returns: the new expiry timestamp
         """
-        at = at or datetime.utcnow()
         ttl = ttl if ttl is not None else self._ttl
-        expires_at = (at + timedelta(seconds=ttl)).timestamp()
+        expires_at = datetime.utcnow() + timedelta(seconds=ttl)
+        return self.rearm_at(expires_at)
 
-        self._expires_at = expires_at
+    def rearm_at(self, at: datetime) -> int:
+        """
+        Re-arms the Expires to `at`.
+
+        Returns: the new expiry timestamp
+        """
+        self._expires_at = at.timestamp()
         self._armed = True
 
         return self.expires_at
+        
 
 
 class RecordBuffer(list):
