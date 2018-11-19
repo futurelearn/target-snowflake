@@ -18,8 +18,6 @@ class TestExpire:
     def test_armed(self, subject):
         assert subject._armed
 
-        import pdb; pdb.set_trace()
-
         # disarming works
         subject.disarm()
         assert not subject._armed
@@ -32,8 +30,6 @@ class TestExpire:
     @freeze_time(now)
     def test_rearm(self, subject):
         assert not subject.expired()
-
-        import pdb; pdb.set_trace()
 
         # can set the TTL ad-hoc
         subject.rearm(1)

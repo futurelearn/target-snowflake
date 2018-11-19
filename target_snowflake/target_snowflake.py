@@ -21,7 +21,7 @@ BUFFER_TTL = 60
 
 class Expires:
     """
-    This abstract a process that should expire in the future.
+    Abstracts a process that expires in the future.
 
     expire = Expire(60)  # in 60s
     expire.expires_at → 1542400508.5480127  # Unix timestamp
@@ -68,7 +68,6 @@ class Expires:
         self._armed = True
 
         return self.expires_at
-        
 
 
 class RecordBuffer(list):
@@ -264,7 +263,7 @@ class TargetSnowflake:
             for stream in (
                 stream for stream, buffer in self.rows.items() if buffer.expired(at=now)
             ):
-                LOGGER.info("{stream}: buffer as expired, flushing.")
+                LOGGER.info("{stream}: buffer has expired, flushing.")
                 self.flush_records(stream)
         elif t == "STATE":
             new_state = o["value"]
