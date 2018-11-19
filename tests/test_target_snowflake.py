@@ -1,6 +1,6 @@
 import pytest
 import os
-
+from unittest import mock
 from jsonschema import ValidationError
 from sqlalchemy import create_engine, inspect
 from snowflake.sqlalchemy import URL
@@ -511,6 +511,20 @@ class TestTargetSnowflake:
         test_stream = "encoded_strings.stream"
 
         self.integration_test(config, snowflake_engine, expected_results, test_stream)
+
+    @mock.patch("target_snowflake.target_snowflake.BUFFER_TTL", 0)
+    def test_buffer_expiry(self, config, snowflake_engine):
+        # check if the schema is a new one, ... etc ..
+        new_schema = not schema_exists(snowflake_engine, config["schema"])
+        target = TargetSnowflake(config)
+
+        stream = load_stream("user_location_data.stream")
+
+        with mock.patch.object(target, "flush_records") as flush_records:
+            for line in stream:
+                target.process_line(line)
+
+            assert flush_records.call_count == 9
 
     def integration_test(
         self, config, snowflake_engine, expected, stream_file, drop_schema=True

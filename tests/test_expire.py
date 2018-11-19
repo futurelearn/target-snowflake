@@ -33,16 +33,13 @@ class TestExpire:
         assert not subject.expired()
 
         # can set the TTL ad-hoc
-        import pdb
-
-        pdb.set_trace()
         subject.rearm(ttl=1, at=now)
         assert subject.expires_at == (now + timedelta(seconds=1)).timestamp()
         assert subject.expired(at=now + timedelta(seconds=2))
 
         # or use the default TTL
-        import pdb
-
-        pdb.set_trace()
         subject.rearm(at=now)
         assert subject.expires_at == (now + timedelta(seconds=10)).timestamp()
+
+        subject.rearm(10)
+        assert subject.expires_at >= (now + timedelta(seconds=10)).timestamp()

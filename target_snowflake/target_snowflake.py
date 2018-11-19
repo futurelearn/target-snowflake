@@ -22,7 +22,6 @@ BUFFER_TTL = 60
 class Expires:
     """
     This abstract a process that should expire in the future.
-    This class is thread safe.
 
     expire = Expire(60)  # in 60s
     expire.expires_at → 1542400508.5480127  # Unix timestamp
@@ -67,20 +66,20 @@ class Expires:
 
 class RecordBuffer(list):
     def __init__(self):
-        self._expire = Expires(BUFFER_TTL, armed=False)
+        self._expires = Expires(BUFFER_TTL, armed=False)
 
     def add_record(self, stream: str, record: Dict):
-        self._expire.keepalive()
+        self._expires.rearm()
         self.append(record)
 
     def values(self):
         return self
 
     def expired(self, at: datetime = None):
-        return self._expire.expired(at=at)
+        return self._expires.expired(at=at)
 
     def disarm(self):
-        self._expire.disarm()
+        self._expires.disarm()
 
 
 class UniqueRecordBuffer(dict):
@@ -100,10 +99,10 @@ class UniqueRecordBuffer(dict):
             yield record
 
     def expired(self, at: int = None):
-        return self._expire.expired(at=at)
+        return self._expires.expired(at=at)
 
     def disarm(self):
-        self._expire.disarm()
+        self._expires.disarm()
 
 
 class StateBuffer:
@@ -254,12 +253,12 @@ class TargetSnowflake:
             if len(self.rows[stream]) >= self.batch_size:
                 self.flush_records(stream)
 
+            # flush expired buffers
             for stream in (
                 stream for stream, buffer in self.rows.items() if buffer.expired(at=now)
             ):
-                logging.info("{stream}: buffer as expired, flushing.")
+                LOGGER.info("{stream}: buffer as expired, flushing.")
                 self.flush_records(stream)
-
         elif t == "STATE":
             new_state = o["value"]
             unflushed_streams = list(self.streams_with_unflushed_records())
