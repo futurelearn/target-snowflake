@@ -368,7 +368,7 @@ class TargetSnowflake:
         for stream in (
             stream for stream, buffer in self.rows.items() if buffer.expired(at=now)
         ):
-            LOGGER.info("{stream}: buffer has expired, flushing.")
+            LOGGER.info(f"{stream}: buffer has expired, flushing.")
             self.flush_records(stream)
 
     def validate_record(self, stream: str, record: Dict, keys: List) -> Dict:
