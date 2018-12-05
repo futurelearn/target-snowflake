@@ -16,11 +16,12 @@ setup(
     url="https://gitlab.com/meltano/target-snowflake",
     classifiers=["Programming Language :: Python :: 3 :: Only"],
     install_requires=[
-        'inflection>=0.3.1',
-        'singer-python>=5.0.12',
-        'snowflake-connector-python',
-        # see https://gitlab.com/meltano/target-snowflake/issues/9
+        'inflection==0.3.1',
+        'singer-python==5.2.3',
+        'snowflake-connector-python==1.6.11',
         'snowflake-sqlalchemy==1.1.2',
+        # conflicts resolution, see https://gitlab.com/meltano/meltano/issues/193
+        'idna==2.7',
     ],
     extras_require={
         'dev': [
