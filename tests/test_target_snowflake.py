@@ -170,6 +170,28 @@ class TestTargetSnowflake:
         self.integration_test(config, snowflake_engine, expected_results, test_stream)
 
     @pytest.mark.slow
+    def test_reserved_keywords_as_attributes(self, config, snowflake_engine):
+        # The expected results to compare
+        expected_results = {
+            "state": {"test_reserved_keywords_as_attributes": 2},
+            "tables": ["test_reserved_keywords_as_attributes"],
+            "columns": {
+                "test_reserved_keywords_as_attributes": [
+                    "id",
+                    "from",
+                    "to",
+                    "label",
+                    config["timestamp_column"],
+                ]
+            },
+            "total_records": {"test_reserved_keywords_as_attributes": 2},
+        }
+
+        test_stream = "reserved_keywords_as_attributes.stream"
+
+        self.integration_test(config, snowflake_engine, expected_results, test_stream)
+
+    @pytest.mark.slow
     def test_optional_attributes(self, config, snowflake_engine):
         # The expected results to compare
         expected_results = {
@@ -514,20 +536,25 @@ class TestTargetSnowflake:
 
     @mock.patch("target_snowflake.target_snowflake.BUFFER_TTL", 0)
     def test_buffer_expiry(self, config, snowflake_engine):
-        # check if the schema is a new one, ... etc ..
-        new_schema = not schema_exists(snowflake_engine, config["schema"])
-        target = TargetSnowflake(config)
+        try:
+            # check if the schema is a new one, ... etc ..
+            new_schema = not schema_exists(snowflake_engine, config["schema"])
+            target = TargetSnowflake(config)
 
-        stream = load_stream("user_location_data.stream")
+            stream = load_stream("user_location_data.stream")
 
-        with mock.patch.object(target, "flush_records") as flush_records:
-            message_count = 0
-            for line in stream:
-                target.process_line(line)
-                message_count += 1
+            with mock.patch.object(target, "flush_records") as flush_records:
+                message_count = 0
+                for line in stream:
+                    target.process_line(line)
+                    message_count += 1
 
-            # flushed at every message
-            assert flush_records.call_count == message_count
+                # flushed at every message
+                assert flush_records.call_count == message_count
+        finally:
+            # Drop the Test Tables
+            for stream, loader in target.loaders.items():
+                loader.table.drop(loader.engine)
 
     def integration_test(
         self, config, snowflake_engine, expected, stream_file, drop_schema=True
