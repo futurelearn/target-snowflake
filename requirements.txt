@@ -2,7 +2,7 @@ black==18.9b0
 inflection==0.3.1
 mypy==0.630
 pytest==3.8
-requests==2.18.4
+requests==2.21.0
 singer-python==5.2.3
-snowflake-connector-python==1.6.10
+snowflake-connector-python==1.7.2
 snowflake-sqlalchemy==1.1.2

@@ -170,6 +170,28 @@ class TestTargetSnowflake:
         self.integration_test(config, snowflake_engine, expected_results, test_stream)
 
     @pytest.mark.slow
+    def test_reserved_keywords_as_attributes(self, config, snowflake_engine):
+        # The expected results to compare
+        expected_results = {
+            "state": {"test_reserved_keywords_as_attributes": 2},
+            "tables": ["test_reserved_keywords_as_attributes"],
+            "columns": {
+                "test_reserved_keywords_as_attributes": [
+                    "id",
+                    "from",
+                    "to",
+                    "label",
+                    config["timestamp_column"],
+                ]
+            },
+            "total_records": {"test_reserved_keywords_as_attributes": 2},
+        }
+
+        test_stream = "reserved_keywords_as_attributes.stream"
+
+        self.integration_test(config, snowflake_engine, expected_results, test_stream)
+
+    @pytest.mark.slow
     def test_optional_attributes(self, config, snowflake_engine):
         # The expected results to compare
         expected_results = {

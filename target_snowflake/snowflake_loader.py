@@ -334,6 +334,8 @@ class SnowflakeLoader:
             INSERT ... ... ...
             ON CONFLICT ({pkey}) DO UPDATE SET {update_clause}
         """
+        reserved_keywords = self.reserved_keywords()
+
         target_table = f"{self.table.schema}.{self.table.name}"
         source_table = f"{self.table.schema}.{tmp_table_name}"
 
@@ -341,6 +343,10 @@ class SnowflakeLoader:
         joins = []
         for primary_key in self.table.primary_key:
             pk = primary_key.name
+
+            if pk.upper() in reserved_keywords:
+                pk = f'"{pk}"'
+
             joins.append(f"{target_table}.{pk} = {source_table}.{pk}")
         join_expr = " AND ".join(joins)
 
@@ -350,6 +356,10 @@ class SnowflakeLoader:
 
         for column in self.table.columns:
             attr = column.name
+
+            if attr.upper() in reserved_keywords:
+                attr = f'"{attr}"'
+
             attributes_target.append(attr)
             attributes_source.append(f"{source_table}.{attr}")
 
@@ -379,3 +389,103 @@ class SnowflakeLoader:
             connection.execute(grant_stmt)
             grant_stmt = f'GRANT SELECT ON ALL TABLES IN SCHEMA "{db_name}"."{self.table.schema}" TO ROLE {role};'
             connection.execute(grant_stmt)
+
+    def reserved_keywords(self) -> List[str]:
+        """
+        Return a list of all reservered words in Snowflake
+
+        Used to quote attributes that are reserved words, like for example
+        a Test table with an attribute Test.from or Test.to
+        """
+        return [
+            "ALL",
+            "ALTER",
+            "AND",
+            "ANY",
+            "AS",
+            "ASC",
+            "BETWEEN",
+            "BY",
+            "CASE",
+            "CAST",
+            "CHECK",
+            "CLUSTER",
+            "COLUMN",
+            "CONNECT",
+            "CREATE",
+            "CROSS",
+            "CURRENT_DATE",
+            "CURRENT_ROLE",
+            "CURRENT_USER",
+            "CURRENT_TIME",
+            "CURRENT_TIMESTAMP",
+            "DELETE",
+            "DESC",
+            "DISTINCT",
+            "DROP",
+            "ELSE",
+            "EXCLUSIVE",
+            "EXISTS",
+            "FALSE",
+            "FOR",
+            "FROM",
+            "FULL",
+            "GRANT",
+            "GROUP",
+            "HAVING",
+            "IDENTIFIED",
+            "ILIKE",
+            "IMMEDIATE",
+            "IN",
+            "INCREMENT",
+            "INNER",
+            "INSERT",
+            "INTERSECT",
+            "INTO",
+            "IS",
+            "JOIN",
+            "LATERAL",
+            "LEFT",
+            "LIKE",
+            "LOCK",
+            "LONG",
+            "MAXEXTENTS",
+            "MINUS",
+            "MODIFY",
+            "NATURAL",
+            "NOT",
+            "NULL",
+            "OF",
+            "ON",
+            "OPTION",
+            "OR",
+            "ORDER",
+            "REGEXP",
+            "RENAME",
+            "REVOKE",
+            "RIGHT",
+            "RLIKE",
+            "ROW",
+            "ROWS",
+            "SAMPLE",
+            "SELECT",
+            "SET",
+            "SOME",
+            "START",
+            "TABLE",
+            "TABLESAMPLE",
+            "THEN",
+            "TO",
+            "TRIGGER",
+            "TRUE",
+            "UNION",
+            "UNIQUE",
+            "UPDATE",
+            "USING",
+            "VALUES",
+            "VIEW",
+            "WHEN",
+            "WHENEVER",
+            "WHERE",
+            "WITH",
+        ]
