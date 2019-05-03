@@ -5,8 +5,8 @@ import logging
 import re
 
 from sqlalchemy import MetaData, Table, Column
-from sqlalchemy.types import TIMESTAMP, Float, String, BigInteger, Boolean
-from snowflake.sqlalchemy import ARRAY, OBJECT
+from sqlalchemy.types import Float, String, BigInteger, Boolean
+from snowflake.sqlalchemy import TIMESTAMP_NTZ, ARRAY, OBJECT
 
 # Set of helper functions for flattening records and schemas.
 # The core ones are:
@@ -35,7 +35,7 @@ def generate_sqlalchemy_table(stream, key_properties, json_schema, timestamp_col
         columns.append(column)
 
     if timestamp_column and timestamp_column not in flat_schema:
-        column = Column(timestamp_column, TIMESTAMP)
+        column = Column(timestamp_column, TIMESTAMP_NTZ)
         columns.append(column)
 
     # Replace all special characters and CamelCase with underscores
@@ -145,7 +145,7 @@ def sqlalchemy_column_type(schema_property):
     elif "array" in property_type:
         return String  # ARRAY
     elif property_format == "date-time":
-        return TIMESTAMP
+        return TIMESTAMP_NTZ
     elif "number" in property_type:
         return Float
     elif "integer" in property_type and "string" in property_type:

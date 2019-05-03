@@ -5,7 +5,7 @@ import functools
 from typing import Dict, List
 from sqlalchemy import create_engine, inspect, Table
 from sqlalchemy.schema import CreateSchema
-from snowflake.sqlalchemy import URL
+from snowflake.sqlalchemy import URL, TIMESTAMP_NTZ
 from snowflake.connector.errors import ProgrammingError
 from snowflake.connector.network import ReauthenticationRequest
 
@@ -28,7 +28,7 @@ MAP_SQLALCHEMY_TO_SNOWFLAKE_TYPE = {
     "FLOAT": "FLOAT",
     "VARCHAR": "VARCHAR(16777216)",
     "BOOLEAN": "BOOLEAN",
-    "TIMESTAMP": "TIMESTAMP",
+    "TIMESTAMP": "TIMESTAMP_NTZ",
 }
 
 
@@ -217,12 +217,18 @@ class SnowflakeLoader:
         all_columns = inspector.get_columns(self.table.name, schema=self.table.schema)
 
         for column in all_columns:
-            existing_columns[column["name"]] = f"{column['type']}"
+            if isinstance(column['type'], TIMESTAMP_NTZ):
+                existing_columns[column["name"]] = "TIMESTAMP_NTZ"
+            else:
+                existing_columns[column["name"]] = f"{column['type']}"
 
         # Check the new Table definition for new attributes or attributes
         #  with an updated data type
         for column in self.table.columns:
-            column_type = MAP_SQLALCHEMY_TO_SNOWFLAKE_TYPE[f"{column.type}"]
+            if isinstance(column.type, TIMESTAMP_NTZ):
+                column_type = "TIMESTAMP_NTZ"
+            else:
+                column_type = MAP_SQLALCHEMY_TO_SNOWFLAKE_TYPE[f"{column.type}"]
 
             if column.name not in existing_columns:
                 # A new column to be added to the table

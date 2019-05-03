@@ -18,8 +18,8 @@ setup(
     install_requires=[
         'inflection==0.3.1',
         'singer-python==5.2.3',
-        'snowflake-connector-python==1.7.2',
-        'snowflake-sqlalchemy==1.1.2',
+        'snowflake-connector-python==1.7.11',
+        'snowflake-sqlalchemy==1.1.12',
         # conflicts resolution, see https://gitlab.com/meltano/meltano/issues/193
         'idna==2.7',
     ],

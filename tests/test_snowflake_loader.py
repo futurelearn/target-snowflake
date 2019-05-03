@@ -5,7 +5,8 @@ import pytest
 from datetime import datetime
 
 from sqlalchemy import MetaData, Table, Column, inspect
-from sqlalchemy.types import TIMESTAMP, Float, String, BigInteger, Boolean
+from sqlalchemy.types import Float, String, BigInteger, Boolean
+from snowflake.sqlalchemy import TIMESTAMP_NTZ
 
 from target_snowflake.snowflake_loader import SnowflakeLoader
 from target_snowflake.utils.snowflake_helpers import (
@@ -28,7 +29,7 @@ def test_table():
         Column("float_attr", Float),
         Column("int_attr", BigInteger),
         Column("bool_attr", Boolean),
-        Column("created_at", TIMESTAMP),
+        Column("created_at", TIMESTAMP_NTZ),
     )
 
 
