@@ -4,6 +4,7 @@ import sys
 import threading
 
 from datetime import datetime, timedelta
+from decimal import Decimal
 from jsonschema import ValidationError, Draft4Validator, FormatChecker
 from typing import Dict, List, Iterator, Optional
 
@@ -11,6 +12,7 @@ from target_snowflake.utils.singer_target_utils import (
     flatten_record,
     flatten_key,
     generate_sqlalchemy_table,
+    float_to_decimal,
 )
 from target_snowflake.snowflake_loader import SnowflakeLoader
 
@@ -300,8 +302,9 @@ class TargetSnowflake:
                 self.schemas.append(stream)
 
             # Add a validator based on the received JSON Schema
+            schema = float_to_decimal(o["schema"])
             self.validators[stream] = Draft4Validator(
-                o["schema"], format_checker=FormatChecker()
+                schema, format_checker=FormatChecker()
             )
 
             # We could live without it for append only use cases without a key,
@@ -382,7 +385,7 @@ class TargetSnowflake:
 
         Returns the flattened record ready for integration
         """
-        self.validators[stream].validate(record)
+        self.validators[stream].validate(float_to_decimal(record))
         flat_record = flatten_record(record, self.entity_attributes[stream])
         missing_keys = [key for key in keys if key not in flat_record]
 
@@ -433,7 +436,7 @@ class TargetSnowflake:
         """
         if state is not None:
             line = json.dumps(state)
-            LOGGER.debug('Emitting state {}'.format(line))
+            LOGGER.debug("Emitting state {}".format(line))
             sys.stdout.write("{}\n".format(line))
             sys.stdout.flush()
 
