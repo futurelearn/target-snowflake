@@ -217,7 +217,7 @@ class SnowflakeLoader:
         all_columns = inspector.get_columns(self.table.name, schema=self.table.schema)
 
         for column in all_columns:
-            if isinstance(column['type'], TIMESTAMP_NTZ):
+            if isinstance(column["type"], TIMESTAMP_NTZ):
                 existing_columns[column["name"]] = "TIMESTAMP_NTZ"
             else:
                 existing_columns[column["name"]] = f"{column['type']}"
