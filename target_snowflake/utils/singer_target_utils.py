@@ -7,6 +7,7 @@ import re
 from sqlalchemy import MetaData, Table, Column
 from sqlalchemy.types import Float, String, BigInteger, Boolean
 from snowflake.sqlalchemy import TIMESTAMP_NTZ, ARRAY, OBJECT
+from decimal import Decimal
 
 # Set of helper functions for flattening records and schemas.
 # The core ones are:
