@@ -1,0 +1,6 @@
+{"type": "SCHEMA", "stream": "test_multiple_of", "key_properties": ["id"], "schema": {"required": ["id"], "type": "object", "properties": {"id": {"minimum": -99999999999999999999999999999999999999, "maximum": 99999999999999999999999999999999999999, "type": "integer"}, "price": {"multipleOf": 1e-38, "type": "number"}}}}
+{"type": "RECORD", "stream": "test_multiple_of", "record": {"id": 1, "price": 1}}
+{"type": "RECORD", "stream": "test_multiple_of", "record": {"id": 2, "price": 2.0}}
+{"type": "RECORD", "stream": "test_multiple_of", "record": {"id": 3, "price": 3.3}}
+{"type": "RECORD", "stream": "test_multiple_of", "record": {"id": 4, "price": 4.4}}
+{"type": "STATE", "value": {"test_multiple_of": 4}}

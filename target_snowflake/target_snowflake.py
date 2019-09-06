@@ -1,3 +1,4 @@
+import decimal
 import json
 import singer
 import sys
@@ -36,6 +37,10 @@ class Expires:
         self._ttl = ttl
         self._expires_at = datetime.utcnow().timestamp() + ttl
         self._armed = armed
+
+        # Fix issue with numeric attributes defined with low "multipleOf"
+        #  values (e.g. 1e-38) causing errors during validation
+        decimal.getcontext().prec = 40
 
     @property
     def expires_at(self):
