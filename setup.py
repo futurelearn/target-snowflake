@@ -19,6 +19,8 @@ setup(
         'inflection==0.3.1',
         'singer-python==5.2.3',
         'asn1crypto<1.0.0',
+        # conflicts resolution, see https://github.com/snowflakedb/snowflake-connector-python/issues/225
+        'azure-storage-blob<12.0',
         'snowflake-connector-python==1.7.11',
         'snowflake-sqlalchemy==1.1.12',
         # conflicts resolution, see https://gitlab.com/meltano/meltano/issues/193
