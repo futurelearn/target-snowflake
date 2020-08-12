@@ -9,8 +9,8 @@ and loads them to Snowflake.
 
 1. Create and activate a virtualenv
 2. `pip install -e '.[dev]'`  
-
-Alternatively, run `make build` to get a docker image containing target-snowflake
+3. Create an .env file to hold the environment variables listed below (SF_ACCOUNT,SF_USER,etc...)
+4. Execute `python target_snowflake/utils/config_generator.py` to generate a proper config.json as described below
 
 
 ## Configuration of Snowflake Target

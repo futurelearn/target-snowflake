@@ -339,7 +339,7 @@ class TargetSnowflake:
                 loader.schema_apply()
             except Exception as exc:
                 LOGGER.error(
-                    "Exception in schema_apply() while prrocessing:\n{}".format(line)
+                    "Exception in schema_apply() while processing:\n{}".format(line)
                 )
                 raise exc
 

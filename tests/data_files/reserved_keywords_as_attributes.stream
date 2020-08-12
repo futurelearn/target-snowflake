@@ -1,4 +1,4 @@
-{"type": "SCHEMA", "stream": "test_reserved_keywords_as_attributes", "key_properties": ["id"], "schema": {"required": ["id"], "type": "object", "properties": {"id": {"type": "integer"}, "from": {"type": "string"}, "to": {"type": "string"}, "label": {"type": "string"}}}}
-{"type": "RECORD", "stream": "test_reserved_keywords_as_attributes", "record": {"id": 1, "from": "2018-01-01", "to": "2018-03-31", "label": "2018-Q1"}}
-{"type": "RECORD", "stream": "test_reserved_keywords_as_attributes", "record": {"id": 2, "from": "2018-04-01", "to": "2018-06-31", "label": "2018-Q2"}}
+{"type": "SCHEMA", "stream": "test_reserved_keywords_as_attributes", "key_properties": ["id"], "schema": {"required": ["id"], "type": "object", "properties": {"id": {"type": "integer"}, "CURRENT_USER": {"type": "string"}, "from": {"type": "string"}, "to": {"type": "string"}, "following": {"type": "string"}, "label": {"type": "string"}}}}
+{"type": "RECORD", "stream": "test_reserved_keywords_as_attributes", "record": {"id": 1, "CURRENT_USER": "Leroy Jenkins", "from": "2018-01-01", "to": "2018-03-31", "following": "whom?", "label": "2018-Q1"}}
+{"type": "RECORD", "stream": "test_reserved_keywords_as_attributes", "record": {"id": 2, "CURRENT_USER": "Leroy Jenkins", "from": "2018-04-01", "to": "2018-06-31", "following": "whom?", "label": "2018-Q2"}}
 {"type": "STATE", "value": {"test_reserved_keywords_as_attributes": 2}}

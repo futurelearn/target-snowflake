@@ -10,6 +10,7 @@ from snowflake.connector.errors import ProgrammingError
 from snowflake.connector.network import ReauthenticationRequest
 
 from target_snowflake.utils.error import SchemaUpdateError
+from target_snowflake.utils.snowflake_helpers import get_reserved_keywords
 
 
 # Don't show all the info log messages from Snowflake
@@ -340,7 +341,7 @@ class SnowflakeLoader:
             INSERT ... ... ...
             ON CONFLICT ({pkey}) DO UPDATE SET {update_clause}
         """
-        reserved_keywords = self.reserved_keywords()
+        reserved_keywords = get_reserved_keywords()
 
         target_table = f"{self.table.schema}.{self.table.name}"
         source_table = f"{self.table.schema}.{tmp_table_name}"
@@ -348,7 +349,7 @@ class SnowflakeLoader:
         # Join using all primary keys
         joins = []
         for primary_key in self.table.primary_key:
-            pk = primary_key.name
+            pk = str(primary_key.name)
 
             if pk.upper() in reserved_keywords:
                 pk = f'"{pk}"'
@@ -361,8 +362,7 @@ class SnowflakeLoader:
         update_sub_clauses = []
 
         for column in self.table.columns:
-            attr = column.name
-
+            attr = str(column.name)
             if attr.upper() in reserved_keywords:
                 attr = f'"{attr}"'
 
@@ -396,102 +396,4 @@ class SnowflakeLoader:
             grant_stmt = f'GRANT SELECT ON ALL TABLES IN SCHEMA "{db_name}"."{self.table.schema}" TO ROLE {role};'
             connection.execute(grant_stmt)
 
-    def reserved_keywords(self) -> List[str]:
-        """
-        Return a list of all reservered words in Snowflake
 
-        Used to quote attributes that are reserved words, like for example
-        a Test table with an attribute Test.from or Test.to
-        """
-        return [
-            "ALL",
-            "ALTER",
-            "AND",
-            "ANY",
-            "AS",
-            "ASC",
-            "BETWEEN",
-            "BY",
-            "CASE",
-            "CAST",
-            "CHECK",
-            "CLUSTER",
-            "COLUMN",
-            "CONNECT",
-            "CREATE",
-            "CROSS",
-            "CURRENT_DATE",
-            "CURRENT_ROLE",
-            "CURRENT_USER",
-            "CURRENT_TIME",
-            "CURRENT_TIMESTAMP",
-            "DELETE",
-            "DESC",
-            "DISTINCT",
-            "DROP",
-            "ELSE",
-            "EXCLUSIVE",
-            "EXISTS",
-            "FALSE",
-            "FOR",
-            "FROM",
-            "FULL",
-            "GRANT",
-            "GROUP",
-            "HAVING",
-            "IDENTIFIED",
-            "ILIKE",
-            "IMMEDIATE",
-            "IN",
-            "INCREMENT",
-            "INNER",
-            "INSERT",
-            "INTERSECT",
-            "INTO",
-            "IS",
-            "JOIN",
-            "LATERAL",
-            "LEFT",
-            "LIKE",
-            "LOCK",
-            "LONG",
-            "MAXEXTENTS",
-            "MINUS",
-            "MODIFY",
-            "NATURAL",
-            "NOT",
-            "NULL",
-            "OF",
-            "ON",
-            "OPTION",
-            "OR",
-            "ORDER",
-            "REGEXP",
-            "RENAME",
-            "REVOKE",
-            "RIGHT",
-            "RLIKE",
-            "ROW",
-            "ROWS",
-            "SAMPLE",
-            "SELECT",
-            "SET",
-            "SOME",
-            "START",
-            "TABLE",
-            "TABLESAMPLE",
-            "THEN",
-            "TO",
-            "TRIGGER",
-            "TRUE",
-            "UNION",
-            "UNIQUE",
-            "UPDATE",
-            "USING",
-            "VALUES",
-            "VIEW",
-            "WHEN",
-            "WHENEVER",
-            "WHERE",
-            "WITH",
-        ]
