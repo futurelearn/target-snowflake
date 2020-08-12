@@ -8,6 +8,7 @@ from sqlalchemy import MetaData, Table, Column
 from sqlalchemy.types import Float, String, BigInteger, Boolean
 from snowflake.sqlalchemy import TIMESTAMP_NTZ, ARRAY, OBJECT
 from decimal import Decimal
+from target_snowflake.utils.snowflake_helpers import get_reserved_keywords
 
 # Set of helper functions for flattening records and schemas.
 # The core ones are:
@@ -21,18 +22,14 @@ from decimal import Decimal
 logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
 
-
 def generate_sqlalchemy_table(stream, key_properties, json_schema, timestamp_column):
     flat_schema = flatten_schema(json_schema)
-    schema_dict = {
-        Column(name, sqlalchemy_column_type(schema), primary_key=True)
-        for (name, schema) in flat_schema.items()
-    }
 
     columns = []
     for (name, schema) in flat_schema.items():
         pk = name in key_properties
-        column = Column(name, sqlalchemy_column_type(schema), primary_key=pk)
+        quote = name.upper() in get_reserved_keywords()
+        column = Column( name, sqlalchemy_column_type(schema), primary_key=pk, quote=quote)
         columns.append(column)
 
     if timestamp_column and timestamp_column not in flat_schema:

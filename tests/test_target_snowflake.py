@@ -178,8 +178,10 @@ class TestTargetSnowflake:
             "columns": {
                 "test_reserved_keywords_as_attributes": [
                     "id",
+                    "current_user",
                     "from",
                     "to",
+                    "following",
                     "label",
                     config["timestamp_column"],
                 ]
@@ -347,7 +349,7 @@ class TestTargetSnowflake:
             updated_config, snowflake_engine, expected_results, test_stream
         )
 
-        # Check that the expected State messages where flushed
+        # Check that the expected State messages were flushed
         expected_stdout = [
             '{"test_multiple_state_messages_a": 1, "test_multiple_state_messages_b": 0}',
             '{"test_multiple_state_messages_a": 3, "test_multiple_state_messages_b": 2}',
