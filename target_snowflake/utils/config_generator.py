@@ -19,7 +19,7 @@ keyfile_mapping = {
     "password": "SF_PASSWORD",
     "role": "SF_ROLE",
     "database": "SF_DATABASE",
-    "schema": "SF_TEST_SCHEMA",
+    "schema": "SF_SCHEMA",
     "warehouse": "SF_WAREHOUSE",
 }
 keyfile_dict = {k: CONFIG_DICT.get(v) for k, v in keyfile_mapping.items()}
