@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="target-snowflake",
-    version="0.1.1",
+    version="0.1.2",
     author="Meltano",
     author_email="meltano@gitlab.com",
     description="Singer.io target for importing data to Snowflake",
