@@ -3,6 +3,7 @@ import json
 import singer
 import sys
 import threading
+import math
 
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -21,6 +22,41 @@ from target_snowflake.snowflake_loader import SnowflakeLoader
 LOGGER = singer.get_logger()
 BUFFER_TTL = 60
 
+def numeric_schema_with_precision(schema):
+    if 'type' not in schema:
+        return False
+    if isinstance(schema['type'], list):
+        if 'number' not in schema['type']:
+            return False
+    elif schema['type'] != 'number':
+        return False
+    if 'multipleOf' in schema:
+        return True
+    return 'minimum' in schema or 'maximum' in schema
+
+
+def walk_schema_for_numeric_precision(schema):
+    # Added a default max precision for cases when the schema does not specify a maximum or minimum precision
+    # Set this default based on https://tools.ietf.org/html/rfc7159#section-6
+    default_maximum_value = 9007199254740991
+    if isinstance(schema, list):
+        for v in schema:
+            walk_schema_for_numeric_precision(v)
+    elif isinstance(schema, dict):
+        if numeric_schema_with_precision(schema):
+            def get_precision(key, default=1):
+                v = abs(Decimal(schema.get(key, default))).log10()
+                if v < 0:
+                    return round(math.floor(v))
+                return round(math.ceil(v))
+            scale = -1 * get_precision('multipleOf')
+            digits = max(get_precision('minimum', default_maximum_value), get_precision('maximum', default_maximum_value))
+            precision = digits + scale
+            if decimal.getcontext().prec < precision:
+                decimal.getcontext().prec = precision
+        else:
+            for v in schema.values():
+                walk_schema_for_numeric_precision(v)
 
 class Expires:
     """
@@ -37,10 +73,6 @@ class Expires:
         self._ttl = ttl
         self._expires_at = datetime.utcnow().timestamp() + ttl
         self._armed = armed
-
-        # Fix issue with numeric attributes defined with low "multipleOf"
-        #  values (e.g. 1e-38) causing errors during validation
-        decimal.getcontext().prec = 40
 
     @property
     def expires_at(self):
@@ -308,6 +340,9 @@ class TargetSnowflake:
 
             # Add a validator based on the received JSON Schema
             schema = float_to_decimal(o["schema"])
+            # Fix issue with numeric attributes defined with low "multipleOf"
+            #  values (e.g. 1e-38) causing errors during validation
+            walk_schema_for_numeric_precision(schema)
             self.validators[stream] = Draft4Validator(
                 schema, format_checker=FormatChecker()
             )

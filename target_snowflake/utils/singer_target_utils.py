@@ -22,6 +22,7 @@ from target_snowflake.utils.snowflake_helpers import get_reserved_keywords
 logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
 
+
 def generate_sqlalchemy_table(stream, key_properties, json_schema, timestamp_column):
     flat_schema = flatten_schema(json_schema)
 
@@ -29,7 +30,9 @@ def generate_sqlalchemy_table(stream, key_properties, json_schema, timestamp_col
     for (name, schema) in flat_schema.items():
         pk = name in key_properties
         quote = name.upper() in get_reserved_keywords()
-        column = Column( name, sqlalchemy_column_type(schema), primary_key=pk, quote=quote)
+        column = Column(
+            name, sqlalchemy_column_type(schema), primary_key=pk, quote=quote
+        )
         columns.append(column)
 
     if timestamp_column and timestamp_column not in flat_schema:

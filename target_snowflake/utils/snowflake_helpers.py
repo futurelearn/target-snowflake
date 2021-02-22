@@ -18,14 +18,16 @@ def drop_snowflake_table(snowflake_engine, db, schema, table):
         # Skip the CASCADE clause to be on the safe side while running tests
         connection.execute(f"DROP TABLE {db}.{schema}.{table}")
 
+
 def get_reserved_keywords():
     """
-        Return a set of all reservered words in Snowflake
-        
-        Used to quote attributes that are reserved words, like for example
-        a Test table with an attribute Test.from or Test.to
+    Return a set of all reservered words in Snowflake
+
+    Used to quote attributes that are reserved words, like for example
+    a Test table with an attribute Test.from or Test.to
     """
-    return set([
+    return set(
+        [
             "ALL",
             "ALTER",
             "AND",
@@ -117,4 +119,5 @@ def get_reserved_keywords():
             "WHENEVER",
             "WHERE",
             "WITH",
-        ])
+        ]
+    )
