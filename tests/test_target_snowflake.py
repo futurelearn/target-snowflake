@@ -556,6 +556,28 @@ class TestTargetSnowflake:
 
         self.integration_test(config, snowflake_engine, expected_results, test_stream)
 
+    @pytest.mark.slow
+    def test_schema_with_multiple_of2(self, config, snowflake_engine):
+        # The expected results to compare
+        expected_results = {
+            "state": {"test_multiple_of2": 1},
+            "tables": ["test_multiple_of2"],
+            "columns": {
+                "test_multiple_of2": [
+                    "id",
+                    "service_cost",
+                    "service_usage",
+                    config["timestamp_column"],
+                ]
+            },
+            "total_records": {"test_multiple_of2": 1},
+
+        }
+
+        test_stream = "schema_with_multiple_of2.stream"
+
+        self.integration_test(config, snowflake_engine, expected_results, test_stream)
+
     @mock.patch("target_snowflake.target_snowflake.BUFFER_TTL", 0)
     def test_buffer_expiry(self, config, snowflake_engine):
         try:

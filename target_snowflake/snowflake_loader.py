@@ -395,5 +395,3 @@ class SnowflakeLoader:
             connection.execute(grant_stmt)
             grant_stmt = f'GRANT SELECT ON ALL TABLES IN SCHEMA "{db_name}"."{self.table.schema}" TO ROLE {role};'
             connection.execute(grant_stmt)
-
-
