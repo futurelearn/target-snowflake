@@ -261,7 +261,7 @@ class TestTargetSnowflake:
             query = (
                 "SELECT COUNT(*) "
                 f" FROM {config['schema']}.test_object_schema_no_properties "
-                " WHERE object_store = '{\\'id\\': 1, \\'metric\\': 1}'"
+                " WHERE object_store = '{\"id\": 1, \"metric\": 1}'"
             )
             result = connection.execute(query).fetchone()
             assert result[0] == 1
@@ -500,6 +500,16 @@ class TestTargetSnowflake:
         test_stream = "array_data.stream"
 
         self.integration_test(config, snowflake_engine, expected_results, test_stream)
+
+        # We also need to test that the proper data records were stored
+        with snowflake_engine.connect() as connection:
+            query = (
+                "SELECT COUNT(*) "
+                f" FROM {config['schema']}.test_carts "
+                " WHERE fruits = '[\"apple\", \"orange\", \"pear\"]'"
+            )
+            result = connection.execute(query).fetchone()
+            assert result[0] == 1
 
     @pytest.mark.slow
     def test_encoded_string_data(self, config, snowflake_engine):
