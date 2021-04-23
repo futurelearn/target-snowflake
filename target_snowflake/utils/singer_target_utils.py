@@ -1,6 +1,7 @@
 import collections
 import inflection
 import itertools
+import json
 import logging
 import re
 
@@ -80,14 +81,14 @@ def flatten_record(d, schema, parent_key=[], sep="__"):
             # If the attribute name (new_key) is defined in the schema
             # Then stop un-nesting and store its values as they are even if
             #  it is an object
-            if isinstance(v, collections.MutableMapping) or type(v) is list:
-                items.append((new_key, str(v)))
+            if isinstance(v, (collections.MutableMapping, list)):
+                items.append((new_key, json.dumps(v)))
             else:
                 items.append((new_key, v))
         elif isinstance(v, collections.MutableMapping):
             items.extend(flatten_record(v, schema, parent_key + [k], sep=sep).items())
         else:
-            items.append((new_key, str(v) if type(v) is list else v))
+            items.append((new_key, json.dumps(v) if isinstance(v, list) else v))
     return dict(items)
 
 
