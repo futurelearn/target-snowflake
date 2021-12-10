@@ -23,6 +23,7 @@ setup(
         'azure-storage-blob<12.0',
         'snowflake-connector-python==1.7.11',
         'snowflake-sqlalchemy==1.1.12',
+        'SQLAlchemy==1.3.24',
         # conflicts resolution, see https://gitlab.com/meltano/meltano/issues/193
         'idna==2.7',
     ],
